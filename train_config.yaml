@@ -1,0 +1,29 @@
+model:
+        encoder:
+                input_channels: 3
+                down_blocks: 3
+                const_blocks: 2
+                pooling_factor: 2
+                internal_embeddings: true
+                first_out_channels: 32
+                down_channel_multiplier: 2
+                const_channel_multiplier: 1
+        decoder:
+                input_channels: 256
+                up_blocks: 3
+                const_blocks: 2
+                scale_factor: 2
+                mode: "bilinear"
+                internal_embeddings: true
+                up_channel_divisor: 2
+                const_channel_divisor: 2
+                output_channels: 3
+loss:
+    reconstruction: 'L1'
+    matching: 'L1'
+optimizer: "adam"
+learning_rate: .001
+batch_size: 6
+num_epochs: 10
+
+
