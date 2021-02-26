@@ -1,4 +1,5 @@
-import pyyaml
+import yaml
+import argparse
 import torch
 import torch.nn as nn
 from models import Encoder, Decoder
@@ -26,13 +27,13 @@ def get_optimizer(cfg, E, D):
     if cfg['optimizer']['algorithm'].lower() == 'adam':
         optimizer = torch.optim.Adam(
                 list(E.parameters())+list(D.parameters()),
-                lr=cfg['optimizer']['learning_rate'],
-                momentum=cfg['optimizer']['momentum']
+                lr=cfg['optimizer']['learning_rate']
                 )
     elif cfg['optimizer']['algorithm'].lower() == 'sgd':
         optimizer = torch.optim.SGD(
                 list(E.parameters())+list(D.parameters()),
-                lr=cfg['optimizer']['learning_rate']
+                lr=cfg['optimizer']['learning_rate'],
+                momentum=cfg['optimizer']['momentum']
                 )
     else:
         raise NotImplementedError
@@ -65,10 +66,15 @@ def train(config_file):
     cfg = get_config(config_file)
     E = get_encoder(cfg)
     D = get_decoder(cfg)
-    train_data_loader, valid_data_loader = get_data_loaders(cfg)
+    #train_data_loader, valid_data_loader = get_data_loaders(cfg)
     optimizer = get_optimizer(cfg, E, D)
     reconstruction_loss = get_reconstruction_loss(cfg)
 
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--config-file', required=True, type=str)
+
+    args = parser.parse_args()
+
+    train(**vars(args))
