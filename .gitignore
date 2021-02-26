@@ -1,2 +1,4 @@
 *.ipynb
+.python-version
+.ada/
 __pycache__/
