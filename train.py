@@ -1,4 +1,6 @@
 import pyyaml
+import torch
+import torch.nn as nn
 from models import Encoder, Decoder
 
 def get_config(config_file):
@@ -21,25 +23,43 @@ def get_data_loaders(cfg):
     raise NotImplementedError
 
 def get_optimizer(cfg, E, D):
-    raise NotImplementedError
+    if cfg['optimizer']['algorithm'].lower() == 'adam':
+        optimizer = torch.optim.Adam(
+                list(E.parameters())+list(D.parameters()),
+                lr=cfg['optimizer']['learning_rate'],
+                momentum=cfg['optimizer']['momentum']
+                )
+    elif cfg['optimizer']['algorithm'].lower() == 'sgd':
+        optimizer = torch.optim.SGD(
+                list(E.parameters())+list(D.parameters()),
+                lr=cfg['optimizer']['learning_rate']
+                )
+    else:
+        raise NotImplementedError
+
+    return optimizer
 
 def get_reconstruction_loss(cfg):
     if cfg['loss']['reconstruction'] == 'L1':
-        raise NotImplementedError
+        loss = nn.L1Loss()
     elif cfg['loss']['reconstruction'] == 'L2':
-        raise NotImplementedError
+        loss = nn.MSELoss()
     elif cfg['loss']['reconstruction'] == 'Perceptual':
         raise NotImplementedError
     else:
         raise NotImplementedError
 
+    return loss
+
 def get_embedding_match_loss(cfg):
     if cfg['loss']['matching'] == 'L1':
-        raise NotImplementedError
+        loss = nn.L1Loss()
     elif cfg['loss']['matching'] == 'L2':
-        raise NotImplementedError
+        loss = nn.MSELoss()
     else:
         raise NotImplementedError
+
+    return loss
 
 def train(config_file):
     cfg = get_config(config_file)
@@ -49,6 +69,6 @@ def train(config_file):
     optimizer = get_optimizer(cfg, E, D)
     reconstruction_loss = get_reconstruction_loss(cfg)
 
-    for i in range(cfg['num_epochs']):
-        #do stuff
 
+if __name__=='__main__':
+    parser = argparse.ArgumentParser()

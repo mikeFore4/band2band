@@ -21,8 +21,10 @@ model:
 loss:
     reconstruction: 'L1'
     matching: 'L1'
-optimizer: "adam"
-learning_rate: .001
+optimizer: 
+    algorithm: "adam"
+    learning_rate: .001
+    momentum: 0.9  
 batch_size: 6
 num_epochs: 10
 

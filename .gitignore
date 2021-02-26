@@ -1,4 +1,6 @@
 *.ipynb
+.b2b/
 .python-version
 .ada/
 __pycache__/
+data/
