@@ -1,8 +1,11 @@
 import yaml
 import argparse
 import torch
+from torch.utils.data import DataLoader
 import torch.nn as nn
+from torchvision import transforms
 from models import Encoder, Decoder
+from datasets import Band2BandDataset
 
 def get_config(config_file):
     with open(config_file, 'r') as f:
@@ -21,7 +24,23 @@ def get_decoder(cfg):
     return D
 
 def get_data_loaders(cfg):
-    raise NotImplementedError
+    trans = transforms.Compose([
+                        transforms.Resize(cfg['data']['image_size']),
+                        transforms.ToTensor()
+                        ])
+    train_dataset = Band2BandDataset(cfg['data']['train_dir'],trans)
+    val_dataset = Band2BandDataset(cfg['data']['val_dir'],trans)
+
+    train_dl = DataLoader(
+                    train_dataset,
+                    batch_size=1,
+                    shuffle=cfg['data']['shuffle']
+                    )
+    val_dl = DataLoader(
+                    val_dataset,
+                    batch_size=1,
+                    )
+    return train_dl, val_dl
 
 def get_optimizer(cfg, E, D):
     if cfg['optimizer']['algorithm'].lower() == 'adam':
@@ -66,7 +85,7 @@ def train(config_file):
     cfg = get_config(config_file)
     E = get_encoder(cfg)
     D = get_decoder(cfg)
-    #train_data_loader, valid_data_loader = get_data_loaders(cfg)
+    train_data_loader, valid_data_loader = get_data_loaders(cfg)
     optimizer = get_optimizer(cfg, E, D)
     reconstruction_loss = get_reconstruction_loss(cfg)
 

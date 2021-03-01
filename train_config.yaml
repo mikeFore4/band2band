@@ -1,33 +1,38 @@
 model:
-        encoder:
-                input_channels: 3
-                down_blocks: 3
-                const_blocks: 2
-                pooling_factor: 2
-                internal_embeddings: true
-                first_out_channels: 32
-                down_channel_multiplier: 2
-                const_channel_multiplier: 1
-                num_classes: 9
-        decoder:
-                input_channels: 256
-                up_blocks: 3
-                const_blocks: 2
-                scale_factor: 2
-                mode: "bilinear"
-                internal_embeddings: true
-                up_channel_divisor: 2
-                const_channel_divisor: 2
-                output_channels: 3
-                num_classes: 9
+    encoder:
+          input_channels: 3
+          down_blocks: 3
+          const_blocks: 2
+          pooling_factor: 2
+          internal_embeddings: true
+          first_out_channels: 32
+          down_channel_multiplier: 2
+          const_channel_multiplier: 1
+          num_classes: 9
+    decoder:
+          input_channels: 256
+          up_blocks: 3
+          const_blocks: 2
+          scale_factor: 2
+          mode: "bilinear"
+          internal_embeddings: true
+          up_channel_divisor: 2
+          const_channel_divisor: 2
+          output_channels: 3
+          num_classes: 9
 loss:
     reconstruction: 'L1'
     matching: 'L1'
 optimizer: 
     algorithm: "adam"
     learning_rate: .001
-    momentum: 0.9  
-batch_size: 6
+    momentum: 0.9
+data:
+    train_dir: "/home/mifore/subdata/train"
+    val_dir: "/home/mifore/subdata/val"
+    shuffle: true 
+    batch_size: 6
+    image_size: 256
 num_epochs: 10
 
 

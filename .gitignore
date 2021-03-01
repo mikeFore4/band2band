@@ -5,3 +5,4 @@ HLS_Raw_File_List.csv
 .ada/
 __pycache__/
 data/
+subdata/
