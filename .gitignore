@@ -1,4 +1,6 @@
 *.ipynb
+checkpoints/
+runs/
 HLS_Raw_File_List.csv
 .b2b/
 .python-version

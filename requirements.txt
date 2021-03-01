@@ -1,6 +1,3 @@
 torch
-ipython
 pyyaml
-numpy
-rasterio
-osgeo
+tensorboard

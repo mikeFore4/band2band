@@ -239,9 +239,7 @@ class SelfAttention(nn.Module):
 class SequentialConditional(nn.Sequential):
 
     def forward(self, x, class_idx):
-        print(x.shape)
         for module in self._modules.values():
             x = module(x, class_idx=class_idx)
-            print(x.shape)
 
         return x
