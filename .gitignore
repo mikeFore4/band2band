@@ -1,4 +1,5 @@
 *.ipynb
+samp_data/
 checkpoints/
 runs/
 HLS_Raw_File_List.csv

@@ -112,9 +112,17 @@ def train(config_file):
     if not os.path.exists(cfg['checkpoint_dir']):
         os.mkdir(cfg['checkpoint_dir'])
 
+    #delete when adding DDP
+    E = E.to('cuda')
+    D = D.to('cuda')
+
     num_iter = 0
     while num_iter < cfg['iterations']:
         for imgs,labels in tqdm(train_data_loader):
+            #delete when adding DDP
+            imgs = imgs.to('cuda')
+            labels = labels.to('cuda')
+
             num_iter += 1
             if num_iter > cfg['iterations']:
                 break
