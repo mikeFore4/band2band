@@ -2,7 +2,7 @@ from torch.utils.data import Dataset
 import os
 from PIL import Image
 import torch
-from itertools import combinations
+from itertools import permutations
 
 class Band2BandDataset(Dataset):
 
@@ -13,7 +13,7 @@ class Band2BandDataset(Dataset):
         pairs = []
         for d in data_dirs:
             fns = [os.path.join(d,x) for x in os.listdir(d)]
-            pairs.extend(combinations(fns,2))
+            pairs.extend(permutations(fns,2))
         self.pairs = pairs
         self.transform = transform
 
