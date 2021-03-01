@@ -28,7 +28,7 @@ def get_decoder(cfg):
 
 def get_data_loaders(cfg):
     trans = transforms.Compose([
-                        transforms.Resize(cfg['data']['image_size']),
+                        transforms.CenterCrop(cfg['data']['image_size']),
                         transforms.ToTensor()
                         ])
     train_dataset = Band2BandDataset(cfg['data']['train_dir'],trans)

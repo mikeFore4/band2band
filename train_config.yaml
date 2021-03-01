@@ -32,13 +32,13 @@ loss:
         weight: 0.25
 optimizer: 
     algorithm: "adam"
-    learning_rate: .001
+    learning_rate: .0001
     momentum: 0.9
 data:
     train_dir: "/home/mifore/band2band/data/train"
     val_dir: "/home/mifore/band2band/data/val"
     shuffle: true 
-    image_size: 256
+    image_size: 512
     batch_size: 24
 iterations: 3000
 log_every: 20

@@ -30,6 +30,7 @@ class Band2BandDataset(Dataset):
                 img = self.transform(img)
 
             img = img.float()
+            #this is hard coded for now but should be a changeable parameter
             img /= 5000
             img = torch.clip(img,0,1)
 
