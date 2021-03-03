@@ -13,4 +13,4 @@ Training requires only a yaml config file and the train.py script:
 python train.py --config-file=<path/to/config.yaml>
 ```
 
-An example config file is given in train_config.yaml
+An example config file is given in config.yaml

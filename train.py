@@ -85,7 +85,6 @@ def get_data_loaders(cfg):
     """
 
     trans = transforms.Compose([
-                        transforms.CenterCrop(cfg['data']['image_size']),
                         transforms.ToTensor()
                         ])
     train_dataset = Band2BandDataset(cfg['data']['train_dir'],trans)
