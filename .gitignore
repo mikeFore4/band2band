@@ -1,4 +1,7 @@
 *.ipynb
+tiling_scripts/
+chipped_data/
+full_size_data/
 samp_data/
 checkpoints/
 runs/
