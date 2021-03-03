@@ -3,6 +3,7 @@ import os
 import argparse
 import torch
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 from torchvision import transforms
@@ -28,19 +29,26 @@ def get_decoder(cfg):
 
 def get_data_loaders(cfg):
     trans = transforms.Compose([
-                        transforms.CenterCrop(cfg['data']['image_size']),
+                        transforms.Centercrop(cfg['data']['image_size']),
                         transforms.ToTensor()
                         ])
     train_dataset = Band2BandDataset(cfg['data']['train_dir'],trans)
     val_dataset = Band2BandDataset(cfg['data']['val_dir'],trans)
 
+    #setup samplers
+    train_sampler = DistributedSampler(train_dataset)
+    val_sampler = DistributedSampler(val_dataset)
+
+    #setup dataloaders
     train_dl = DataLoader(
                     train_dataset,
+                    sampler = train_sampler,
                     batch_size=cfg['data']['batch_size'],
                     shuffle=cfg['data']['shuffle']
                     )
     val_dl = DataLoader(
                     val_dataset,
+                    sampler = val_sampler,
                     batch_size=1,
                     )
     return train_dl, val_dl
@@ -98,8 +106,20 @@ def get_feature_match_loss(cfg):
 
 def train(config_file):
     cfg = get_config(config_file)
+
+    #setup processes for distributed training
+    init_process_group(cfg['backend'])
+
+    #initialize encoder
     E = get_encoder(cfg)
+    E = E.to(cfg['device'])
+    E = nn.parallel.DistributedDataParallel(E)
+
+    #initialize decoder
     D = get_decoder(cfg)
+    D = D.to(cfg['device'])
+    D = nn.parallel.DistributedDataParallel(D)
+
     train_data_loader, valid_data_loader = get_data_loaders(cfg)
     optimizer = get_optimizer(cfg, E, D)
     reconstruction_self_loss = get_reconstruction_self_loss(cfg)
@@ -111,10 +131,6 @@ def train(config_file):
     total_match_loss = 0
     if not os.path.exists(cfg['checkpoint_dir']):
         os.mkdir(cfg['checkpoint_dir'])
-
-    #delete when adding DDP
-    E = E.to('cuda')
-    D = D.to('cuda')
 
     num_iter = 0
     while num_iter < cfg['iterations']:

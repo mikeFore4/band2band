@@ -45,4 +45,5 @@ log_every: 20
 log_directory: 'runs'
 checkpoint_every: 100
 checkpoint_dir: 'checkpoints'
-
+backend: 'gloo'
+device: 'cpu'
