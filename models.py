@@ -2,10 +2,41 @@ import torch.nn as nn
 from components import ResBlockUp, ResBlockDown, ResBlock, SelfAttention, SequentialConditional
 
 class Encoder(nn.Module):
+    """
+    Encoder module for band2band translation
+    """
 
-    def __init__(self, input_channels, down_blocks, const_blocks, num_classes, pooling_factor=2,
-            internal_embeddings=True, first_out_channels=32,
+    def __init__(self, input_channels, down_blocks, const_blocks, num_classes, pooling_factor=2, first_out_channels=32,
             down_channel_multiplier=2, const_channel_multiplier=1):
+        """
+        Initizalizer for Encoder
+
+        ...
+
+        Inputs
+        ------
+            input_channels : int
+                number of channels for input images
+            down_blocks : int
+                number of downsampling residual blocks
+            const_blocks : int
+                number of residual blocks that preserve the spatial dimension
+            num_classes : int
+                number of separate internal embeddings to generate
+            pooling_factor : int
+                upsampling factor to be used by torch.nn.functional.avg_pool2d
+                (default = 2)
+            first_out_channels : int
+                number of output channels for first convolutional layer
+                (default = 32)
+            down_channel_multiplier : int
+                rate used to increase number of channels with each downsampling
+                block (default = 2)
+            const_channel_multiplier : int
+                rate used to increase the number of channels with each const
+                block (default = 1)
+        """
+
         super(Encoder, self).__init__()
 
         model = []
@@ -20,7 +51,7 @@ class Encoder(nn.Module):
                         in_channels=in_channels,
                         out_channels=out_channels,
                         pooling_factor=pooling_factor,
-                        internal_embeddings=internal_embeddings,
+                        internal_embeddings=True,
                         num_classes=num_classes
                         )
                     )
@@ -32,7 +63,7 @@ class Encoder(nn.Module):
                     ResBlock(
                         in_channels=in_channels,
                         out_channels=out_channels,
-                        internal_embeddings=internal_embeddings,
+                        internal_embeddings=True,
                         num_classes=num_classes
                         )
                     )
@@ -40,14 +71,60 @@ class Encoder(nn.Module):
         self.model=SequentialConditional(*model)
 
     def forward(self, x, class_idx):
-         return self.model(x, class_idx=class_idx)
+        """
+        Forward pass for Encoder module
+
+        ...
+
+        Inputs
+        ------
+        x : torch.tensor
+            input image
+        class_idx : torch.tensor
+            band number of input image
+        """
+
+        return self.model(x, class_idx=class_idx)
 
 class Decoder(nn.Module):
+    """
+    Decoder module for band2band translation
+    """
 
     def __init__(self, input_channels, up_blocks, const_blocks, num_classes,
-            scale_factor=2, mode='bilinear',
-            internal_embeddings=True, up_channel_divisor=2,
-            const_channel_divisor=1, output_channels=3):
+            out_channels, scale_factor=2, mode='bilinear', up_channel_divisor=2,
+            const_channel_divisor=1):
+        """
+        Initizalizer for Decoder
+
+        ...
+
+        Inputs
+        ------
+            input_channels : int
+                number of channels for input images
+            up_blocks : int
+                number of upsampling residual blocks
+            const_blocks : int
+                number of residual blocks that preserve the spatial dimension
+            num_classes : int
+                number of separate internal embeddings to generate
+            output_channels : int
+                number of channels to output in final generation
+            scale_factor : int
+                upsampling factor to be used by torch.nn.functional.interpolate
+                (default = 2)
+            mode : str
+                upsampling algorithm to be used by torch.nn.functional.interpolate
+                (default = 'bilinear')
+            up_channel_divisor : int
+                rate used to decrease number of channels with each upsampling
+                block (default = 2)
+            const_channel_divisor : int
+                rate used to decrease the number of channels with each const
+                block (default = 1)
+        """
+
         super(Decoder, self).__init__()
 
         model = []
@@ -58,7 +135,7 @@ class Decoder(nn.Module):
                     ResBlock(
                         in_channels,
                         out_channels,
-                        internal_embeddings=internal_embeddings,
+                        internal_embeddings=True,
                         num_classes=num_classes
                         )
                     )
@@ -72,7 +149,7 @@ class Decoder(nn.Module):
                         out_channels,
                         scale_factor=scale_factor,
                         mode=mode,
-                        internal_embeddings=internal_embeddings,
+                        internal_embeddings=True,
                         num_classes=num_classes
                         )
                     )
@@ -84,7 +161,7 @@ class Decoder(nn.Module):
                 output_channels,
                 scale_factor=scale_factor,
                 mode=mode,
-                internal_embeddings=internal_embeddings,
+                internal_embeddings=True,
                 num_classes=num_classes
                 )
             )
@@ -92,4 +169,8 @@ class Decoder(nn.Module):
         self.model = SequentialConditional(*model)
 
     def forward(self, x, class_idx):
-         return self.model(x, class_idx=class_idx)
+        """
+        Forward pass for Decoder module
+        """
+
+        return self.model(x, class_idx=class_idx)

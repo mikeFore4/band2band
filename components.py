@@ -3,12 +3,41 @@ from torch.nn.utils import spectral_norm
 import torch.nn.functional as F
 
 class ResBlockUp(nn.Module):
-    """This block is based on the upsampling residual block used in the smaller
-    model in https://arxiv.org/pdf/1809.11096v2.pdf. This implementation
-    included suggestions from https://arxiv.org/pdf/1905.08233v1.pdf"""
+    """
+    A Residual Upsampling Block including convolutional layers and instance
+    normalization. The design is based roughly on the upsampling residual block
+    used in https://arxiv.org/pdf/1809.11096v2.pdf. This implementation
+    includes suggestions from https://arxiv.org/pdf/1905.08233v1.pdf
+    """
 
     def __init__(self, in_channels, out_channels, scale_factor=2, mode='bilinear',
             internal_embeddings=False, num_classes=None):
+        """
+        Initialization function for the ResBlockUp module.
+
+        ...
+
+        Inputs
+        ---------
+        in_channels : int
+            number of input channels to block
+        out_channels : int
+            desired number of output channels from block
+        scale_factor : int
+            upsampling factor to be used by torch.nn.functional.interpolate
+            (default = 2)
+        mode : str
+            upsampling algorithm to be used by torch.nn.functional.interpolate
+            (default = 'bilinear')
+        internal_embeddings : bool
+            indicates whether modulation parameters for normalization be generated
+            from internal embedding layers or inputted externally during forward
+            passes (default = False)
+        num_classes : int
+            only used when internal_embeddings is True. Number of embedding
+            layers to create internally
+        """
+
         super(ResBlockUp, self).__init__()
 
         self.internal_embeddings = internal_embeddings
@@ -34,6 +63,35 @@ class ResBlockUp(nn.Module):
                 stride=1))
 
     def forward(self, x, gamma1=None, gamma2=None, beta1=None, beta2=None, class_idx=None):
+        """
+        Forward pass for ResBlockUp Module
+
+        ...
+
+        Inputs
+        ------
+        x : torch.tensor
+            input features (should have channels equal to self.in_channels)
+        gamma1 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the multiplicative modulation parameters for the first
+            instance normalization layer (default = None)
+        gamma2 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the multiplicative modulation parameters for the second
+            instance normalization layer
+        beta1 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the additive modulation parameters for the first
+            instance normalization layer
+        beta2 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the additive modulation parameters for the second
+            instance normalization layer
+        class_idx : torch.tensor
+            required when self.internal_embeddings is True. Contains tensor of
+            indexes corresponding to internal embedding layers
+        """
 
         #pass through right side
         if self.internal_embeddings:
@@ -57,12 +115,38 @@ class ResBlockUp(nn.Module):
         return x+out
 
 class ResBlockDown(nn.Module):
-    """This block is based on the downsampling residual block used in the smaller
-    model in https://arxiv.org/pdf/1809.11096v2.pdf. This implementation
-    included suggestions from https://arxiv.org/pdf/1905.08233v1.pdf"""
+    """
+    A Residual Downsampling Block including convolutional layers and instance
+    normalization. The design is based roughly on the downsampling residual block
+    used in https://arxiv.org/pdf/1809.11096v2.pdf. This implementation
+    includes suggestions from https://arxiv.org/pdf/1905.08233v1.pdf
+    """
 
     def __init__(self, in_channels, out_channels, pooling_factor=2, internal_embeddings=False,
             num_classes=None):
+        """
+        Initialization function for the ResBlockDown module.
+
+        ...
+
+        Inputs
+        ---------
+        in_channels : int
+            number of input channels to block
+        out_channels : int
+            desired number of output channels from block
+        pooling_factor : int
+            upsampling factor to be used by torch.nn.functional.avg_pool2d
+            (default = 2)
+        internal_embeddings : bool
+            indicates whether modulation parameters for normalization be generated
+            from internal embedding layers or inputted externally during forward
+            passes (default = False)
+        num_classes : int
+            only used when internal_embeddings is True. Number of embedding
+            layers to create internally
+        """
+
         super(ResBlockDown, self).__init__()
 
         self.internal_embeddings = internal_embeddings
@@ -79,6 +163,35 @@ class ResBlockDown(nn.Module):
                 kernel_size=1, stride=1))
 
     def forward(self, x, gamma1=None, gamma2=None, beta1=None, beta2=None, class_idx=None):
+        """
+        Forward pass for ResBlockDown Module
+
+        ...
+
+        Inputs
+        ------
+        x : torch.tensor
+            input features (should have channels equal to self.in_channels)
+        gamma1 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the multiplicative modulation parameters for the first
+            instance normalization layer (default = None)
+        gamma2 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the multiplicative modulation parameters for the second
+            instance normalization layer
+        beta1 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the additive modulation parameters for the first
+            instance normalization layer
+        beta2 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the additive modulation parameters for the second
+            instance normalization layer
+        class_idx : torch.tensor
+            required when self.internal_embeddings is True. Contains tensor of
+            indexes corresponding to internal embedding layers
+        """
 
         #right side
         out = F.relu(x)
@@ -103,12 +216,34 @@ class ResBlockDown(nn.Module):
 
 class ResBlock(nn.Module):
     """
-    This block is based on the up and down sampling blocks included here,
-    but doesn't change the size (no sampling)
+    A Residual Block including convolutional layers and instance
+    normalization. The design is based roughly on the down and up sampling
+    residual blocks used in https://arxiv.org/pdf/1809.11096v2.pdf. This
+    implementation includes suggestions from https://arxiv.org/pdf/1905.08233v1.pdf
     """
 
-    def __init__(self, in_channels, out_channels, internal_embeddings=False,
+    def __init__(self, in_ channels, out_channels, internal_embeddings=False,
             num_classes=None):
+        """
+        Initialization function for the ResBlock module.
+
+        ...
+
+        Inputs
+        ---------
+        in_channels : int
+            number of input channels to block
+        out_channels : int
+            desired number of output channels from block
+        internal_embeddings : bool
+            indicates whether modulation parameters for normalization be generated
+            from internal embedding layers or inputted externally during forward
+            passes (default = False)
+        num_classes : int
+            only used when internal_embeddings is True. Number of embedding
+            layers to create internally
+        """
+
         super(ResBlock, self).__init__()
 
         self.internal_embeddings = internal_embeddings
@@ -123,6 +258,35 @@ class ResBlock(nn.Module):
                 kernel_size=1, stride=1))
 
     def forward(self, x, gammas=None, betas=None, class_idx=None):
+        """
+        Forward pass for ResBlock Module
+
+        ...
+
+        Inputs
+        ------
+        x : torch.tensor
+            input features (should have channels equal to self.in_channels)
+        gamma1 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the multiplicative modulation parameters for the first
+            instance normalization layer (default = None)
+        gamma2 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the multiplicative modulation parameters for the second
+            instance normalization layer
+        beta1 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the additive modulation parameters for the first
+            instance normalization layer
+        beta2 : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the additive modulation parameters for the second
+            instance normalization layer
+        class_idx : torch.tensor
+            required when self.internal_embeddings is True. Contains tensor of
+            indexes corresponding to internal embedding layers
+        """
 
         if not self.internal_embeddings:
             gamma_shape = [dim for dim in gammas.shape]
@@ -152,16 +316,28 @@ class ResBlock(nn.Module):
 class AdaIN(nn.Module):
     """
     Implementation of Adaptive Instance Normalization for vision tasks
-        channels: integer number of channels for this layer
-        internal_embeddings: boolean indicating whether to build in embedding
-        layer to compute gammas and betas for denormalizatin transform inside
-        this module (True), or to take gammas and betas as input in a forward
-        pass (False)
-        num_classes: number of embeddings to generate (if internal_embeddings
-        is True)
     """
 
     def __init__(self, channels, internal_embeddings=False, num_classes=None):
+        """
+        Initialization method for AdaIN module
+
+        ...
+
+        Inputs
+        ------
+        channels : int
+            number of channels for this layer, both input and output
+        internal_embeddings : bool
+            indicates whether to build in embedding
+            layer to compute gammas and betas for denormalizatin transform inside
+            this module (True), or to take gammas and betas as input in a forward
+            pass (False) (default = False)
+        num_classes: int
+            number of embeddings to generate if internal_embeddings
+            is True (default=None)
+        """
+
         super(AdaIN, self).__init__()
         self.internal_embeddings = internal_embeddings
         if self.internal_embeddings:
@@ -175,6 +351,27 @@ class AdaIN(nn.Module):
         self.instance_norm = nn.InstanceNorm2d(channels, affine=False)
 
     def forward(self, x, gammas=None, betas=None, class_idx=None):
+        """
+        Forward pass for AdaIN Module
+
+        ...
+
+        Inputs
+        ------
+        x : torch.tensor
+            input features (should have channels equal to self.in_channels)
+        gammas : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the multiplicative modulation parameters
+            (default = None)
+        betas : torch.tensor
+            required when self.internal_embeddings is False. Gives a tensor
+            providing the additive modulation parameters
+            (default = None)
+        class_idx : torch.tensor
+            required when self.internal_embeddings is True. Contains tensor of
+            indexes corresponding to internal embedding layers
+        """
         x = self.instance_norm(x)
         if self.internal_embeddings:
             assert len(class_idx.shape) == 2
@@ -190,9 +387,34 @@ class AdaIN(nn.Module):
         return x
 
 class SpectralNormConv2d(nn.Module):
+    """
+    Simple module that combines Conv2d with spectral normalization. Can be used
+    in place of Conv2d
+    """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
             padding=0, bias=True):
+        """
+        Initialization for SpectralNormConv2d layer
+
+        ...
+
+        Inputs
+        ------
+        in_channels : int
+            number of input channels for input tensor
+        out_channels : int
+            number of channels for output tensor
+        kernel_size : int
+            spatial dimension of square convolutional filter
+        stride : int
+            step distance for convolutional filter (default = 1)
+        padding : int
+            padding to apply to input tensor for convolution (default = 0)
+        bias : bool
+            indicates whether to add bias to output (default = True)
+        """
+
         super(SpectralNormConv2d, self).__init__()
 
         self.SNConv = spectral_norm(nn.Conv2d(in_channels=in_channels,
@@ -200,6 +422,16 @@ class SpectralNormConv2d(nn.Module):
             padding=padding, bias=bias))
 
     def forward(self, x):
+        """
+        Forward pass for SpectralNormConv2d module
+
+        ...
+
+        Inputs
+        ------
+        x : torch.tensor
+        """
+
         return self.SNConv(x)
 
 class SelfAttention(nn.Module):
@@ -207,8 +439,25 @@ class SelfAttention(nn.Module):
     This class code is copied directly from this repo:
     https://github.com/ajbrock/BigGAN-PyTorch and is based on the blocks from
     the original SA-GAN paper: https://arxiv.org/pdf/1805.08318v2.pdf
+    Implements self attention module
     """
     def __init__(self, ch, which_conv=SpectralNormConv2d, name='attention'):
+        """
+        Initialization for SelfAttention module
+
+        ...
+
+        Inputs
+        ------
+        ch : int
+            channel multiplier
+        which_conv : torch.nn.Module
+            what type of convolutional layer to use
+            (default = SpectralNormConv2d)
+        name : str
+            (default = 'attention')
+        """
+
         super(Attention, self).__init__()
         # Channel multiplier
         self.ch = ch
@@ -221,14 +470,23 @@ class SelfAttention(nn.Module):
         self.gamma = P(torch.tensor(0.), requires_grad=True)
 
     def forward(self, x, y=None):
+        """
+        Forward pass for SelfAttention module
+
+        ...
+
+        Inputs
+        ------
+        x : torch.tensor
+        """
         # Apply convs
         theta = self.theta(x)
         phi = F.max_pool2d(self.phi(x), [2,2])
         g = F.max_pool2d(self.g(x), [2,2])
         # Perform reshapes
-        theta = theta.view(-1, self. ch // 8, x.shape[2] * x.shape[3])
-        phi = phi.view(-1, self. ch // 8, x.shape[2] * x.shape[3] // 4)
-        g = g.view(-1, self. ch // 2, x.shape[2] * x.shape[3] // 4)
+        theta = theta.view(-1, self.ch // 8, x.shape[2] * x.shape[3])
+        phi = phi.view(-1, self.ch // 8, x.shape[2] * x.shape[3] // 4)
+        g = g.view(-1, self.ch // 2, x.shape[2] * x.shape[3] // 4)
         # Matmul and softmax to get attention maps
         beta = F.softmax(torch.bmm(theta.transpose(1, 2), phi), -1)
         # Attention map times g path
@@ -237,6 +495,10 @@ class SelfAttention(nn.Module):
         return self.gamma * o + x
 
 class SequentialConditional(nn.Sequential):
+    """
+    Subclass of nn.Sequential that allows a specific additional input of
+    "class_idx" to be passed to the modules in the sequential layer
+    """
 
     def forward(self, x, class_idx):
         for module in self._modules.values():

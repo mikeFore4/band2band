@@ -13,22 +13,77 @@ from datasets import Band2BandDataset
 from tqdm import tqdm
 
 def get_config(config_file):
+    """
+    Load config from yaml format
+
+    Inputs
+    ------
+    config_file : str
+
+    Outputs
+    -------
+    cfg : dict
+    """
+
     with open(config_file, 'r') as f:
         cfg = yaml.full_load(f)
 
     return cfg
 
 def get_encoder(cfg):
+    """
+    Loads encoder module (defined in models.py file) using parameters specified
+    in config
+
+    ...
+
+    Inputs
+    ------
+    cfg : dict
+
+    Outputs
+    -------
+    E : Encoder
+    """
+
     E = Encoder(**cfg['model']['encoder'])
 
     return E
 
 def get_decoder(cfg):
+    """
+    Loads decoder module (defined in models.py file) using parameters specified
+    in config
+
+    ...
+
+    Inputs
+    ------
+    cfg : dict
+
+    Outputs
+    -------
+    D : Decoder
+    """
     D = Decoder(**cfg['model']['decoder'])
 
     return D
 
 def get_data_loaders(cfg):
+    """
+    Prepares data loaders from config. Dataloaders are designed to be used with
+    torch.nn.parallel.DistributedDataParallel
+
+    Inputs
+    ------
+    cfg : dict
+
+    Outputs
+    -------
+    train_dl : torch.utils.data.DataLoader
+    val_dl : torch.utils.data.DataLoader
+    """
+
     trans = transforms.Compose([
                         transforms.CenterCrop(cfg['data']['image_size']),
                         transforms.ToTensor()
@@ -54,6 +109,20 @@ def get_data_loaders(cfg):
     return train_dl, val_dl
 
 def get_optimizer(cfg, E, D):
+    """
+    Creates torch optimizers for Encoder and Decoder models
+
+    Inputs
+    ------
+    cfg : dict
+    E : Encoder
+    D : Decoder
+
+    Outputs
+    -------
+    torch optimizer
+    """
+
     if cfg['optimizer']['algorithm'].lower() == 'adam':
         optimizer = torch.optim.Adam(
                 list(E.parameters())+list(D.parameters()),
@@ -71,6 +140,19 @@ def get_optimizer(cfg, E, D):
     return optimizer
 
 def get_reconstruction_self_loss(cfg):
+    """
+    Uses config to decide which type of loss to use for self reconstruction
+    (meaning we are trying to reconstruct the original using the decoder)
+
+    Inputs
+    ------
+    cfg : dict
+
+    Outputs
+    -------
+    torch loss module
+    """
+
     if cfg['loss']['reconstruction_self']['type'] == 'L1':
         loss = nn.L1Loss()
     elif cfg['loss']['reconstruction_self']['type'] == 'L2':
@@ -83,6 +165,20 @@ def get_reconstruction_self_loss(cfg):
     return loss
 
 def get_reconstruction_gen_loss(cfg):
+    """
+    Uses config to decide which type of loss to use for reconstruction of a
+    generated class (meaning we are trying to generate a different class from
+    the input image using the decoder)
+
+    Inputs
+    ------
+    cfg : dict
+
+    Outputs
+    -------
+    torch loss module
+    """
+
     if cfg['loss']['reconstruction_gen']['type'] == 'L1':
         loss = nn.L1Loss()
     elif cfg['loss']['reconstruction_gen']['type'] == 'L2':
@@ -95,6 +191,20 @@ def get_reconstruction_gen_loss(cfg):
     return loss
 
 def get_feature_match_loss(cfg):
+    """
+    Uses config to decide which type of loss to use for feature matching of
+    intermediate features output from the encoder for multiple bands of the
+    same image
+
+    Inputs
+    ------
+    cfg : dict
+
+    Outputs
+    -------
+    torch loss module
+    """
+
     if cfg['loss']['matching']['type'] == 'L1':
         loss = nn.L1Loss()
     elif cfg['loss']['matching']['type'] == 'L2':
@@ -105,12 +215,34 @@ def get_feature_match_loss(cfg):
     return loss
 
 def setup(cfg, rank):
+    """
+    Set up DistributedDataParallel code
+
+    Inputs
+    ------
+    cfg : dict
+    rank : int
+        rank number of master process
+    """
+
+    #set necessary environment variables
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12355'
 
     dist.init_process_group(cfg['backend'], rank=rank)
 
 def train(config_file, local_rank):
+    """
+    Performs training of Encoder and Decoder modules
+
+    Inputs
+    ------
+    config_file : str
+        path to location of yaml config file
+    local_rank : int
+        rank number of master process for distributed training
+    """
+
     cfg = get_config(config_file)
 
     #setup processes for distributed training
