@@ -2,6 +2,7 @@ import yaml
 import os
 import argparse
 import torch
+import torch.distributed as dist
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -29,7 +30,7 @@ def get_decoder(cfg):
 
 def get_data_loaders(cfg):
     trans = transforms.Compose([
-                        transforms.Centercrop(cfg['data']['image_size']),
+                        transforms.CenterCrop(cfg['data']['image_size']),
                         transforms.ToTensor()
                         ])
     train_dataset = Band2BandDataset(cfg['data']['train_dir'],trans)
@@ -44,7 +45,6 @@ def get_data_loaders(cfg):
                     train_dataset,
                     sampler = train_sampler,
                     batch_size=cfg['data']['batch_size'],
-                    shuffle=cfg['data']['shuffle']
                     )
     val_dl = DataLoader(
                     val_dataset,
@@ -104,11 +104,17 @@ def get_feature_match_loss(cfg):
 
     return loss
 
-def train(config_file):
+def setup(cfg, rank):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+
+    dist.init_process_group(cfg['backend'], rank=rank)
+
+def train(config_file, local_rank):
     cfg = get_config(config_file)
 
     #setup processes for distributed training
-    init_process_group(cfg['backend'])
+    setup(cfg, local_rank)
 
     #initialize encoder
     E = get_encoder(cfg)
@@ -136,8 +142,8 @@ def train(config_file):
     while num_iter < cfg['iterations']:
         for imgs,labels in tqdm(train_data_loader):
             #delete when adding DDP
-            imgs = imgs.to('cuda')
-            labels = labels.to('cuda')
+            imgs = imgs.to(cfg['device'])
+            labels = labels.to(cfg['device'])
 
             num_iter += 1
             if num_iter > cfg['iterations']:
@@ -210,6 +216,7 @@ def train(config_file):
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config-file', required=True, type=str)
+    parser.add_argument('--local_rank',default=0,type=int)
 
     args = parser.parse_args()
 
