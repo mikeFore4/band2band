@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 from torchvision import transforms
 from models import Encoder, Decoder
-from datasets import Band2BandDataset
+from Band2BandDataset import Band2BandDataset
 from tqdm import tqdm
 
 def get_config(config_file):

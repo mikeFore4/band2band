@@ -92,7 +92,7 @@ class Decoder(nn.Module):
     """
 
     def __init__(self, input_channels, up_blocks, const_blocks, num_classes,
-            out_channels, scale_factor=2, mode='bilinear', up_channel_divisor=2,
+            output_channels, scale_factor=2, mode='bilinear', up_channel_divisor=2,
             const_channel_divisor=1):
         """
         Initizalizer for Decoder

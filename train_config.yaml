@@ -33,8 +33,8 @@ optimizer:
     learning_rate: .0001
     momentum: 0.9
 data:
-    train_dir: "/home/mifore/work/synth/adagan/data/train"
-    val_dir: "/home/mifore/work/synth/adagan/data/val"
+    train_dir: "/home/mifore/work/synth/adagan/chipped_data/train"
+    val_dir: "/home/mifore/work/synth/adagan/chipped_data/val"
     shuffle: true 
     image_size: 512
     batch_size: 24

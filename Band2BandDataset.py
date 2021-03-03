@@ -8,7 +8,7 @@ class Band2BandDataset(Dataset):
     """
     Custom pytorch dataset for Band2Band trainslation. Requires data to already
     be structured in the form of:
-        <head_directory>/<common_file_stem>/<band_number.tif>
+        <head_directory>/<common_file_stem>/<tile_number>/<band_number.tif>
     """
 
     def __init__(self, data_directory, transform=None):
@@ -27,9 +27,17 @@ class Band2BandDataset(Dataset):
 
         super(Band2BandDataset, self).__init__()
 
-        data_dirs = [os.path.join(data_directory, x) for x in os.listdir(data_directory)]
+        #extract all directories for common image filename stems
+        image_groups = [os.path.join(data_directory,x) for x in
+                os.listdir(data_directory)]
+        #extract every tile directory
+        tile_dirs = []
+        for ig in image_groups:
+            tile_dirs.extend([os.path.join(ig,x) for x in os.listdir(ig)])
+
+        #get all pairwise combinations of tiles of the same image
         pairs = []
-        for d in data_dirs:
+        for d in tile_dirs:
             fns = [os.path.join(d,x) for x in os.listdir(d)]
             pairs.extend(permutations(fns,2))
         self.pairs = pairs

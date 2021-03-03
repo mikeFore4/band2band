@@ -222,7 +222,7 @@ class ResBlock(nn.Module):
     implementation includes suggestions from https://arxiv.org/pdf/1905.08233v1.pdf
     """
 
-    def __init__(self, in_ channels, out_channels, internal_embeddings=False,
+    def __init__(self, in_channels, out_channels, internal_embeddings=False,
             num_classes=None):
         """
         Initialization function for the ResBlock module.
