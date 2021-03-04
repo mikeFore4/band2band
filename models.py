@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 from components import ResBlockUp, ResBlockDown, ResBlock, SelfAttention, SequentialConditional
 
 class Encoder(nn.Module):
@@ -173,4 +174,4 @@ class Decoder(nn.Module):
         Forward pass for Decoder module
         """
 
-        return self.model(x, class_idx=class_idx)
+        return F.sigmoid(self.model(x, class_idx=class_idx))

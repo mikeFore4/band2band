@@ -21,16 +21,16 @@ model:
 loss:
     reconstruction_self: 
         type: 'L2'
-        weight: 0.25
+        weight: 0.0
     reconstruction_gen: 
         type: 'L2'
-        weight: 0.5
+        weight: 1.0
     matching: 
         type: 'L2'
-        weight: 0.25
+        weight: 0.0
 optimizer: 
     algorithm: "adam"
-    learning_rate: .0001
+    learning_rate: .00001
     momentum: 0.9
 data:
     train_dir: "/home/mifore/band2band/data/chip_256/train"
