@@ -69,7 +69,7 @@ def get_decoder(cfg):
 
     return D
 
-def get_data_loaders(cfg):
+def get_data_loaders(cfg, world_size):
     """
     Prepares data loaders from config. Dataloaders are designed to be used with
     torch.nn.parallel.DistributedDataParallel
@@ -88,11 +88,11 @@ def get_data_loaders(cfg):
                         transforms.ToTensor()
                         ])
     train_dataset = Band2BandDataset(cfg['data']['train_dir'],trans)
-    val_dataset = Band2BandDataset(cfg['data']['val_dir'],trans)
+    #val_dataset = Band2BandDataset(cfg['data']['val_dir'],trans)
 
     #setup samplers
     train_sampler = DistributedSampler(train_dataset)
-    val_sampler = DistributedSampler(val_dataset)
+    #val_sampler = DistributedSampler(val_dataset)
 
     #setup dataloaders
     train_dl = DataLoader(
@@ -100,12 +100,13 @@ def get_data_loaders(cfg):
                     sampler = train_sampler,
                     batch_size=cfg['data']['batch_size'],
                     )
-    val_dl = DataLoader(
-                    val_dataset,
-                    sampler = val_sampler,
-                    batch_size=1,
-                    )
-    return train_dl, val_dl
+    #val_dl = DataLoader(
+    #                val_dataset,
+    #                sampler = val_sampler,
+    #                batch_size=1,
+    #                )
+    #return train_dl, val_dl
+    return train_dl
 
 def get_optimizer(cfg, E, D):
     """
@@ -228,9 +229,20 @@ def setup(cfg, rank):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12355'
 
-    dist.init_process_group(cfg['backend'], rank=rank)
+    dist.init_process_group(cfg['backend'], rank=rank, world_size=2)
 
-def train(config_file, local_rank):
+def get_device_information():
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        num_gpus = torch.cuda.device_count()
+    else:
+        device = torch.device('cpu')
+        num_gpus = 0
+
+    return device, num_gpus
+
+
+def train(cfg, device, world_size, local_rank, distributed):
     """
     Performs training of Encoder and Decoder modules
 
@@ -242,22 +254,25 @@ def train(config_file, local_rank):
         rank number of master process for distributed training
     """
 
-    cfg = get_config(config_file)
-
-    #setup processes for distributed training
-    setup(cfg, local_rank)
-
     #initialize encoder
+    print('Initializing Encoder')
     E = get_encoder(cfg)
-    E = E.to(cfg['device'])
-    E = nn.parallel.DistributedDataParallel(E)
+    E = E.to(device)
+    if distributed:
+        E = nn.parallel.DistributedDataParallel(E, device_ids=[local_rank],
+                output_device=local_rank)
 
     #initialize decoder
+    print('Initializing Decoder')
     D = get_decoder(cfg)
-    D = D.to(cfg['device'])
-    D = nn.parallel.DistributedDataParallel(D)
+    D = D.to(device)
+    if distributed:
+        D = nn.parallel.DistributedDataParallel(D, device_ids=[local_rank],
+                output_device=local_rank)
 
-    train_data_loader, valid_data_loader = get_data_loaders(cfg)
+    print('Building dataloaders')
+    #train_data_loader, valid_data_loader = get_data_loaders(cfg)
+    train_data_loader = get_data_loaders(cfg, world_size)
     optimizer = get_optimizer(cfg, E, D)
     reconstruction_self_loss = get_reconstruction_self_loss(cfg)
     reconstruction_gen_loss = get_reconstruction_gen_loss(cfg)
@@ -269,12 +284,13 @@ def train(config_file, local_rank):
     if not os.path.exists(cfg['checkpoint_dir']):
         os.mkdir(cfg['checkpoint_dir'])
 
+    print('Beginning training')
     num_iter = 0
     while num_iter < cfg['iterations']:
         for imgs,labels in tqdm(train_data_loader):
             #delete when adding DDP
-            imgs = imgs.to(cfg['device'])
-            labels = labels.to(cfg['device'])
+            imgs = imgs.to(device)
+            labels = labels.to(device)
 
             num_iter += 1
             if num_iter > cfg['iterations']:
@@ -306,14 +322,14 @@ def train(config_file, local_rank):
                                 ],
                             1)
             output = D(embs,labels)
-            imgs = imgs.view(-1,2,imgs.shape[1],imgs.shape[2],imgs.shape[3])
-            imgs = torch.cat([
-                        imgs[:,1,:,:,:].view(-1,1,imgs.shape[2],imgs.shape[3],imgs.shape[4]),
-                        imgs[:,0,:,:,:].view(-1,1,imgs.shape[2],imgs.shape[3],imgs.shape[4])
+            imgs_swapped = imgs.view(-1,2,imgs.shape[1],imgs.shape[2],imgs.shape[3])
+            imgs_swapped = torch.cat([
+                        imgs_swapped[:,1,:,:,:].view(-1,1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4]),
+                        imgs_swapped[:,0,:,:,:].view(-1,1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4])
                         ],
                     1)
-            imgs = imgs.view([-1,imgs.shape[2],imgs.shape[3],imgs.shape[4]])
-            loss_rec_swap = reconstruction_gen_loss(output,imgs)
+            imgs_swapped = imgs_swapped.view([-1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4]])
+            loss_rec_swap = reconstruction_gen_loss(output,imgs_swapped)
             total_gen_loss += loss_rec_swap.item()
 
             #backpropagate
@@ -344,6 +360,21 @@ def train(config_file, local_rank):
     torch.save(D.state_dict(),
             os.path.join(cfg['checkpoint_dir'],f'Decoder_final.pth'))
 
+def run_training(config_file, local_rank):
+    cfg = get_config(config_file)
+
+    device, num_gpus = get_device_information()
+    distributed = num_gpus > 1
+
+    if distributed:
+        torch.cuda.set_device(local_rank)
+        dist.init_process_group(cfg['backend'], rank=local_rank,
+                world_size=num_gpus)
+
+    train(cfg, device, num_gpus, local_rank, distributed)
+
+
+
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config-file', required=True, type=str)
@@ -351,4 +382,4 @@ if __name__=='__main__':
 
     args = parser.parse_args()
 
-    train(**vars(args))
+    run_training(**vars(args))

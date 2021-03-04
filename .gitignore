@@ -1,4 +1,5 @@
 *.ipynb
+runs_old/
 tiling_scripts/
 chipped_data/
 full_size_data/

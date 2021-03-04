@@ -33,15 +33,13 @@ optimizer:
     learning_rate: .0001
     momentum: 0.9
 data:
-    train_dir: "/home/mifore/work/synth/adagan/chipped_data/train"
-    val_dir: "/home/mifore/work/synth/adagan/chipped_data/val"
-    shuffle: true 
-    image_size: 512
-    batch_size: 24
-iterations: 3000
+    train_dir: "/home/mifore/band2band/data/chip_256/train"
+    val_dir: "/home/mifore/band2band/data/chip_256/val"
+    batch_size: 12
+iterations: 10000
 log_every: 20
 log_directory: 'runs'
 checkpoint_every: 100
 checkpoint_dir: 'checkpoints'
-backend: 'gloo'
-device: 'cpu'
+backend: 'nccl'
+device: 'cuda'
