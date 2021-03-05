@@ -1,7 +1,8 @@
 *.ipynb
+test_run/
 runs_old/
 tiling_scripts/
-chipped_data/
+chip_256/
 full_size_data/
 samp_data/
 checkpoints/

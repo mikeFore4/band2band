@@ -1,45 +1,51 @@
+model_dir: test_run
 model:
-    encoder:
-          input_channels: 1
-          down_blocks: 3
-          const_blocks: 2
-          pooling_factor: 2
-          first_out_channels: 32
-          down_channel_multiplier: 2
-          const_channel_multiplier: 1
-          num_classes: 14
-    decoder:
-          input_channels: 128
-          up_blocks: 3
-          const_blocks: 2
-          scale_factor: 2
-          mode: "bilinear"
-          up_channel_divisor: 2
-          const_channel_divisor: 2
-          output_channels: 1
-          num_classes: 14
+        encoder:
+                input_channels: 1
+                down_blocks: 3
+                const_blocks: 2
+                pooling_factor: 2
+                first_out_channels: 32
+                down_channel_multiplier: 2
+                const_channel_multiplier: 1
+                num_classes: 14
+        decoder:
+                input_channels: 128
+                up_blocks: 3
+                const_blocks: 2
+                scale_factor: 2
+                mode: "bilinear"
+                up_channel_divisor: 2
+                const_channel_divisor: 2
+                output_channels: 1
+                num_classes: 14
 loss:
-    reconstruction_self: 
-        type: 'L2'
-        weight: 0.3
-    reconstruction_gen: 
-        type: 'L2'
-        weight: 0.5
-    matching: 
-        type: 'L2'
-        weight: 0.2
+        reconstruction_self: 
+                type: 'L2'
+                weight: 0.3
+        reconstruction_gen: 
+                type: 'L2'
+                weight: 0.5
+        matching: 
+                type: 'L2'
+                weight: 0.2
 optimizer: 
-    algorithm: "adam"
-    learning_rate: .0001
-    momentum: 0.9
+        algorithm: "adam"
+        learning_rate: .0001
+        momentum: 0.9
 data:
-    train_dir: "/home/mifore/band2band/data/chip_256/train"
-    val_dir: "/home/mifore/band2band/data/chip_256/val"
-    batch_size: 12
-iterations: 10000
-log_every: 20
-log_directory: 'runs/run0'
-checkpoint_every: 100
-checkpoint_dir: 'checkpoints'
+        train_dir: "/home/mifore/work/synth/adagan/chip_256/train"
+        val_dir: "/home/mifore/work/synth/adagan/chip_256/val"
+        batch_size: 12
+validation:
+        do_validation: true
+        val_every: 5
+        iterations: 10
+training:
+        iterations: 20
+        log_every: 5
+        log_directory: 'runs/run0'
+        checkpoint_every: 100
+        checkpoint_dir: 'checkpoints'
 backend: 'nccl'
 device: 'cuda'

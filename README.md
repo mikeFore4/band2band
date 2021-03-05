@@ -7,9 +7,14 @@ In scenarios where one would like to have an image to image translation model fo
 
 Our method is similar to the concept of [adaptive instance normalization](https://vision.cornell.edu/se3/wp-content/uploads/2017/08/adain.pdf). However, rather than learning a model to infer denormalization parameters from an input image at inference time, our method learns a separate embedding for each class during training. In this sense, the denormalization parameters are not fully adaptive, but rather conditional upon a fixed set of classes, or which any class can be selected at inference time.
 
-## Training
+## Use
 Training uses torch's DistributedDataParallel module to enable training across multiple nodes and/or gpus. Training requires only a yaml config file and can be started via:
 ```
-python -m torch.distributed.launch --nprocs_per_node=<num_gpus_per_node> train.py --config-file=<path/to/config.yaml>
+python -m torch.distributed.launch --nprocs_per_node=<num_gpus_per_node> train_net.py --config-file=<path/to/config.yaml>
 ```
 An example config file is given in config.yaml
+
+Validation can be performed during training or separately. To perform a separate validation run, execute:
+```
+python -m torch.distributed.launch --nprocs_per_node=<num_gpus_per_node> test_net.py --config-file=<path/to/config.yaml>
+```

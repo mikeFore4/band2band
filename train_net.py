@@ -30,6 +30,11 @@ def get_config(config_file):
 
     return cfg
 
+def write_config(cfg):
+
+    with open(os.path.join(cfg['model_dir'],'config.yaml'), 'w') as f:
+        yaml.dump(cfg, f, indent=4)
+
 def get_encoder(cfg):
     """
     Loads encoder module (defined in models.py file) using parameters specified
@@ -69,7 +74,7 @@ def get_decoder(cfg):
 
     return D
 
-def get_data_loaders(cfg, world_size):
+def get_train_loader(cfg, world_size, distributed):
     """
     Prepares data loaders from config. Dataloaders are designed to be used with
     torch.nn.parallel.DistributedDataParallel
@@ -77,36 +82,85 @@ def get_data_loaders(cfg, world_size):
     Inputs
     ------
     cfg : dict
+    world_size : int
+        number of processes
+    distributed : bool
+        whether application is running on multiple nodes/gpus or not
 
     Outputs
     -------
     train_dl : torch.utils.data.DataLoader
-    val_dl : torch.utils.data.DataLoader
+    train_dataset : torch.utils.data.Dataset
     """
 
     trans = transforms.Compose([
                         transforms.ToTensor()
                         ])
     train_dataset = Band2BandDataset(cfg['data']['train_dir'],trans)
-    #val_dataset = Band2BandDataset(cfg['data']['val_dir'],trans)
 
     #setup samplers
-    train_sampler = DistributedSampler(train_dataset)
-    #val_sampler = DistributedSampler(val_dataset)
+    if distributed:
+        train_sampler = DistributedSampler(train_dataset)
 
     #setup dataloaders
-    train_dl = DataLoader(
-                    train_dataset,
-                    sampler = train_sampler,
-                    batch_size=cfg['data']['batch_size'],
-                    )
-    #val_dl = DataLoader(
-    #                val_dataset,
-    #                sampler = val_sampler,
-    #                batch_size=1,
-    #                )
-    #return train_dl, val_dl
-    return train_dl
+    if distributed:
+        train_dl = DataLoader(
+                        train_dataset,
+                        sampler = train_sampler,
+                        batch_size=cfg['data']['batch_size'],
+                        )
+    else:
+        train_dl = DataLoader(
+                        train_dataset,
+                        shuffle = True,
+                        batch_size=cfg['data']['batch_size']
+                        )
+
+    return train_dataset, train_dl
+
+def get_val_loader(cfg, world_size, distributed):
+    """
+    Prepares data loaders from config. Dataloaders are designed to be used with
+    torch.nn.parallel.DistributedDataParallel
+
+    Inputs
+    ------
+    cfg : dict
+    world_size : int
+        number of processes
+    distributed : bool
+        whether application is running on multiple nodes/gpus or not
+
+    Outputs
+    -------
+    val_dl : torch.utils.data.DataLoader
+    val_dataset : torch.utils.data.Dataset
+    """
+
+    trans = transforms.Compose([
+                        transforms.ToTensor()
+                        ])
+    val_dataset = Band2BandDataset(cfg['data']['val_dir'],trans)
+
+    #setup samplers
+    if distributed:
+        val_sampler = DistributedSampler(val_dataset)
+
+    #setup dataloaders
+    if distributed:
+        val_dl = DataLoader(
+                        val_dataset,
+                        sampler = val_sampler,
+                        batch_size = 1
+                        )
+    else:
+        val_dl = DataLoader(
+                        val_dataset,
+                        shuffle = True,
+                        batch_size = 1
+                        )
+
+    return val_dataset, val_dl
 
 def get_optimizer(cfg, E, D):
     """
@@ -214,33 +268,54 @@ def get_feature_match_loss(cfg):
 
     return loss
 
-def setup(cfg, rank):
-    """
-    Set up DistributedDataParallel code
-
-    Inputs
-    ------
-    cfg : dict
-    rank : int
-        rank number of master process
-    """
-
-    #set necessary environment variables
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-
-    dist.init_process_group(cfg['backend'], rank=rank, world_size=2)
-
 def get_device_information():
     if torch.cuda.is_available():
         device = torch.device('cuda')
-        num_gpus = torch.cuda.device_count()
+        world_size = torch.cuda.device_count()
     else:
         device = torch.device('cpu')
-        num_gpus = 0
+        world_size = 0
 
-    return device, num_gpus
+    return device, world_size
 
+def validate(cfg, E, D, val_data_loader, reconstruction_gen_loss, dataset_len,
+        device):
+        val_dl = iter(val_data_loader)
+        total_gen_loss = 0
+        with torch.no_grad():
+            for val_iter in range(cfg['validation']['iterations']):
+                if val_iter >= dataset_len:
+                    break
+                imgs,labels = val_dl.next()
+
+                imgs = imgs.to(device)
+                labels = labels.to(device)
+
+                labels = labels.view(-1,1)
+                imgs = imgs.view([-1,imgs.shape[2],imgs.shape[3],imgs.shape[4]])
+                #extract embeddings from Encoder
+                embs = E(imgs, labels)
+
+                #generate new band
+                labels_swapped = labels.view(-1,2,1)
+                labels_swapped = torch.cat([
+                                    labels_swapped[:,1,:].view(-1,1,1),
+                                    labels_swapped[:,0,:].view(-1,1,1)
+                                    ],
+                                1)
+                labels_swapped = labels_swapped.view(-1,1)
+                imgs_swapped = imgs.view(-1,2,imgs.shape[1],imgs.shape[2],imgs.shape[3])
+                imgs_swapped = torch.cat([
+                            imgs_swapped[:,1,:,:,:].view(-1,1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4]),
+                            imgs_swapped[:,0,:,:,:].view(-1,1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4])
+                            ],
+                        1)
+                imgs_swapped = imgs_swapped.view([-1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4]])
+                output_swapped = D(embs, labels_swapped)
+                loss_rec_swap = reconstruction_gen_loss(output_swapped,imgs_swapped)
+                total_gen_loss += loss_rec_swap.item()/cfg['validation']['iterations']
+
+        return total_gen_loss
 
 def train(cfg, device, world_size, local_rank, distributed):
     """
@@ -271,30 +346,32 @@ def train(cfg, device, world_size, local_rank, distributed):
                 output_device=local_rank)
 
     print('Building dataloaders')
-    #train_data_loader, valid_data_loader = get_data_loaders(cfg)
-    train_data_loader = get_data_loaders(cfg, world_size)
+    train_dataset, train_data_loader = get_train_loader(cfg, world_size, distributed)
+    if cfg['validation']['do_validation']:
+        val_dataset, val_data_loader = get_val_loader(cfg, world_size,
+                distributed)
     optimizer = get_optimizer(cfg, E, D)
     reconstruction_self_loss = get_reconstruction_self_loss(cfg)
     reconstruction_gen_loss = get_reconstruction_gen_loss(cfg)
     match_loss = get_feature_match_loss(cfg)
     if local_rank == 0:
-        logger = SummaryWriter(cfg['log_directory'])
+        logger = SummaryWriter(cfg['training']['log_directory'])
     total_self_loss = 0
     total_gen_loss = 0
     total_match_loss = 0
-    if not os.path.exists(cfg['checkpoint_dir']):
-        os.mkdir(cfg['checkpoint_dir'])
+    if not os.path.exists(cfg['training']['checkpoint_dir']):
+        os.mkdir(cfg['training']['checkpoint_dir'])
 
     print('Beginning training')
     num_iter = 0
-    while num_iter < cfg['iterations']:
+    while num_iter < cfg['training']['iterations']:
         for imgs,labels in tqdm(train_data_loader):
             #delete when adding DDP
             imgs = imgs.to(device)
             labels = labels.to(device)
 
             num_iter += 1
-            if num_iter > cfg['iterations']:
+            if num_iter > cfg['training']['iterations']:
                 break
             optimizer.zero_grad()
             labels = labels.view(-1,1)
@@ -344,46 +421,58 @@ def train(cfg, device, world_size, local_rank, distributed):
             #take optimization step
             optimizer.step()
 
-            if num_iter % cfg['log_every'] == 0:
+            if num_iter % cfg['training']['log_every'] == 0:
                 if local_rank == 0:
-                    total_self_loss /= cfg['log_every']
-                    total_gen_loss /= cfg['log_every']
-                    total_match_loss /= cfg['log_every']
-                    logger.add_scalar('Loss/train_self_reconstruction',
+                    total_self_loss /= cfg['training']['log_every']
+                    total_gen_loss /= cfg['training']['log_every']
+                    total_match_loss /= cfg['training']['log_every']
+                    logger.add_scalar('Train_loss/self_reconstruction',
                             total_self_loss, num_iter)
-                    logger.add_scalar('Loss/train_generative_reconstruction',
+                    logger.add_scalar('Train_loss/generative_reconstruction',
                             total_gen_loss, num_iter)
-                    logger.add_scalar('Loss/train_feature_matching',
+                    logger.add_scalar('Train_loss/feature_matching',
                             total_match_loss, num_iter)
                     total_self_loss = 0
                     total_gen_loss = 0
                     total_match_loss = 0
 
-            if (num_iter+1) % cfg['checkpoint_every'] == 0:
+            if (num_iter+1) % cfg['training']['checkpoint_every'] == 0:
                 torch.save(E.state_dict(),
-                        os.path.join(cfg['checkpoint_dir'],f'Encoder_{num_iter}.pth'))
+                        os.path.join(cfg['training']['checkpoint_dir'],f'Encoder_{num_iter}.pth'))
                 torch.save(D.state_dict(),
-                        os.path.join(cfg['checkpoint_dir'],f'Decoder_{num_iter}.pth'))
+                        os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_{num_iter}.pth'))
+
+            if cfg['validation']['do_validation']:
+                if (num_iter+1) % cfg['validation']['val_every'] == 0:
+                    val_loss = validate(cfg, E, D, val_data_loader,
+                            reconstruction_gen_loss, len(val_dataset),
+                            device)
+                    logger.add_scalar('Validation_loss/generative_reconstruction',
+                            val_loss, num_iter)
 
     torch.save(E.state_dict(),
-            os.path.join(cfg['checkpoint_dir'],f'Encoder_final.pth'))
+            os.path.join(cfg['training']['checkpoint_dir'],f'Encoder_final.pth'))
     torch.save(D.state_dict(),
-            os.path.join(cfg['checkpoint_dir'],f'Decoder_final.pth'))
+            os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_final.pth'))
 
 def run_training(config_file, local_rank):
     cfg = get_config(config_file)
+    if not os.path.exists(cfg['model_dir']):
+        os.mkdir(cfg['model_dir'])
+    write_config(cfg)
 
-    device, num_gpus = get_device_information()
-    distributed = num_gpus > 1
+    device, world_size = get_device_information()
+    distributed = world_size > 1
 
     if distributed:
         torch.cuda.set_device(local_rank)
         dist.init_process_group(cfg['backend'], rank=local_rank,
-                world_size=num_gpus)
+                world_size=world_size)
+    else:
+        world_size = 1
+        local_rank = 0
 
-    train(cfg, device, num_gpus, local_rank, distributed)
-
-
+    train(cfg, device, world_size, local_rank, distributed)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
