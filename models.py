@@ -174,4 +174,4 @@ class Decoder(nn.Module):
         Forward pass for Decoder module
         """
 
-        return F.sigmoid(self.model(x, class_idx=class_idx))
+        return self.model(x, class_idx=class_idx)

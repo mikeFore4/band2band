@@ -303,17 +303,17 @@ def train(cfg, device, world_size, local_rank, distributed):
             embs = E(imgs, labels)
 
             #feature matching loss
-            #loss_m = match_loss(
-            #        embs.view([-1,2,embs.shape[1],embs.shape[2],embs.shape[3]])[:,0,:,:],
-            #        embs.view([-1,2,embs.shape[1],embs.shape[2],embs.shape[3]])[:,1,:,:]
-            #        )
-            #total_match_loss += loss_m.item()
+            loss_m = match_loss(
+                    embs.view([-1,2,embs.shape[1],embs.shape[2],embs.shape[3]])[:,0,:,:],
+                    embs.view([-1,2,embs.shape[1],embs.shape[2],embs.shape[3]])[:,1,:,:]
+                    )
+            total_match_loss += loss_m.item()
 
             #reconstruct same band
-            #output = D(embs, labels)
+            output = D(embs, labels)
             #reconstruction loss
-            #loss_rec_same =  reconstruction_self_loss(output,imgs)
-            #total_self_loss = loss_rec_same.item()
+            loss_rec_same =  reconstruction_self_loss(output,imgs)
+            total_self_loss += loss_rec_same.item()
 
             #generate new band
             labels_swapped = labels.view(-1,2,1)
@@ -335,23 +335,29 @@ def train(cfg, device, world_size, local_rank, distributed):
             total_gen_loss += loss_rec_swap.item()
 
             #backpropagate
-            #total_loss = cfg['loss']['reconstruction_self']['weight']*loss_rec_same + \
-            #        cfg['loss']['reconstruction_gen']['weight']*loss_rec_swap + \
-            #        cfg['loss']['matching']['weight']*loss_m
-            #total_loss.backward()
-            loss_rec_swap.backward()
+            total_loss = cfg['loss']['reconstruction_self']['weight']*loss_rec_same + \
+                    cfg['loss']['reconstruction_gen']['weight']*loss_rec_swap + \
+                    cfg['loss']['matching']['weight']*loss_m
+            total_loss.backward()
+            #loss_rec_swap.backward()
 
             #take optimization step
             optimizer.step()
 
             if num_iter % cfg['log_every'] == 0:
                 if local_rank == 0:
-                    #logger.add_scalar('Loss/train_self_reconstruction',
-                    #        total_self_loss, num_iter)
+                    total_self_loss /= cfg['log_every']
+                    total_gen_loss /= cfg['log_every']
+                    total_match_loss /= cfg['log_every']
+                    logger.add_scalar('Loss/train_self_reconstruction',
+                            total_self_loss, num_iter)
                     logger.add_scalar('Loss/train_generative_reconstruction',
                             total_gen_loss, num_iter)
-                    #logger.add_scalar('Loss/train_feature_matching',
-                    #        total_match_loss, num_iter)
+                    logger.add_scalar('Loss/train_feature_matching',
+                            total_match_loss, num_iter)
+                    total_self_loss = 0
+                    total_gen_loss = 0
+                    total_match_loss = 0
 
             if (num_iter+1) % cfg['checkpoint_every'] == 0:
                 torch.save(E.state_dict(),
