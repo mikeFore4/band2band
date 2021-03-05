@@ -363,92 +363,95 @@ def train(cfg, device, world_size, local_rank, distributed):
         os.mkdir(cfg['training']['checkpoint_dir'])
 
     print('Beginning training')
-    num_iter = 0
-    while num_iter < cfg['training']['iterations']:
-        for imgs,labels in tqdm(train_data_loader):
-            #delete when adding DDP
-            imgs = imgs.to(device)
-            labels = labels.to(device)
+    t_dl = iter(train_data_loader)
+    train_ds_len = len(train_dataset)
+    for num_iter in tqdm(range(cfg['training']['iterations'])):
+        if num_iter % train_ds_len == 0:
+            t_dl = iter(train_data_loader)
+        imgs, labels = t_dl.next()
+        imgs = imgs.to(device)
+        labels = labels.to(device)
 
-            num_iter += 1
-            if num_iter > cfg['training']['iterations']:
-                break
-            optimizer.zero_grad()
-            labels = labels.view(-1,1)
-            imgs = imgs.view([-1,imgs.shape[2],imgs.shape[3],imgs.shape[4]])
-            #extract embeddings from Encoder
-            embs = E(imgs, labels)
+        num_iter += 1
+        if num_iter > cfg['training']['iterations']:
+            break
+        optimizer.zero_grad()
+        labels = labels.view(-1,1)
+        imgs = imgs.view([-1,imgs.shape[2],imgs.shape[3],imgs.shape[4]])
+        #extract embeddings from Encoder
+        embs = E(imgs, labels)
 
-            #feature matching loss
-            loss_m = match_loss(
-                    embs.view([-1,2,embs.shape[1],embs.shape[2],embs.shape[3]])[:,0,:,:],
-                    embs.view([-1,2,embs.shape[1],embs.shape[2],embs.shape[3]])[:,1,:,:]
-                    )
-            total_match_loss += loss_m.item()
+        #feature matching loss
+        loss_m = match_loss(
+                embs.view([-1,2,embs.shape[1],embs.shape[2],embs.shape[3]])[:,0,:,:],
+                embs.view([-1,2,embs.shape[1],embs.shape[2],embs.shape[3]])[:,1,:,:]
+                )
+        total_match_loss += loss_m.item()
 
-            #reconstruct same band
-            output = D(embs, labels)
-            #reconstruction loss
-            loss_rec_same =  reconstruction_self_loss(output,imgs)
-            total_self_loss += loss_rec_same.item()
+        #reconstruct same band
+        output = D(embs, labels)
+        #reconstruction loss
+        loss_rec_same =  reconstruction_self_loss(output,imgs)
+        total_self_loss += loss_rec_same.item()
 
-            #generate new band
-            labels_swapped = labels.view(-1,2,1)
-            labels_swapped = torch.cat([
-                                labels_swapped[:,1,:].view(-1,1,1),
-                                labels_swapped[:,0,:].view(-1,1,1)
-                                ],
-                            1)
-            labels_swapped = labels_swapped.view(-1,1)
-            imgs_swapped = imgs.view(-1,2,imgs.shape[1],imgs.shape[2],imgs.shape[3])
-            imgs_swapped = torch.cat([
-                        imgs_swapped[:,1,:,:,:].view(-1,1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4]),
-                        imgs_swapped[:,0,:,:,:].view(-1,1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4])
-                        ],
-                    1)
-            imgs_swapped = imgs_swapped.view([-1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4]])
-            output_swapped = D(embs, labels_swapped)
-            loss_rec_swap = reconstruction_gen_loss(output_swapped,imgs_swapped)
-            total_gen_loss += loss_rec_swap.item()
+        #generate new band
+        labels_swapped = labels.view(-1,2,1)
+        labels_swapped = torch.cat([
+                            labels_swapped[:,1,:].view(-1,1,1),
+                            labels_swapped[:,0,:].view(-1,1,1)
+                            ],
+                        1)
+        labels_swapped = labels_swapped.view(-1,1)
+        imgs_swapped = imgs.view(-1,2,imgs.shape[1],imgs.shape[2],imgs.shape[3])
+        imgs_swapped = torch.cat([
+                    imgs_swapped[:,1,:,:,:].view(-1,1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4]),
+                    imgs_swapped[:,0,:,:,:].view(-1,1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4])
+                    ],
+                1)
+        imgs_swapped = imgs_swapped.view([-1,imgs_swapped.shape[2],imgs_swapped.shape[3],imgs_swapped.shape[4]])
+        output_swapped = D(embs, labels_swapped)
+        loss_rec_swap = reconstruction_gen_loss(output_swapped,imgs_swapped)
+        total_gen_loss += loss_rec_swap.item()
 
-            #backpropagate
-            total_loss = cfg['loss']['reconstruction_self']['weight']*loss_rec_same + \
-                    cfg['loss']['reconstruction_gen']['weight']*loss_rec_swap + \
-                    cfg['loss']['matching']['weight']*loss_m
-            total_loss.backward()
-            #loss_rec_swap.backward()
+        #backpropagate
+        total_loss = cfg['loss']['reconstruction_self']['weight']*loss_rec_same + \
+                cfg['loss']['reconstruction_gen']['weight']*loss_rec_swap + \
+                cfg['loss']['matching']['weight']*loss_m
+        total_loss.backward()
+        #loss_rec_swap.backward()
 
-            #take optimization step
-            optimizer.step()
+        #take optimization step
+        optimizer.step()
 
-            if num_iter % cfg['training']['log_every'] == 0:
+        if num_iter % cfg['training']['log_every'] == 0:
+            if local_rank == 0:
+                total_self_loss /= cfg['training']['log_every']
+                total_gen_loss /= cfg['training']['log_every']
+                total_match_loss /= cfg['training']['log_every']
+                logger.add_scalar('Train_loss/self_reconstruction',
+                        total_self_loss, num_iter)
+                logger.add_scalar('Train_loss/generative_reconstruction',
+                        total_gen_loss, num_iter)
+                logger.add_scalar('Train_loss/feature_matching',
+                        total_match_loss, num_iter)
+                total_self_loss = 0
+                total_gen_loss = 0
+                total_match_loss = 0
+        if cfg['validation']['do_validation']:
+            if (num_iter+1) % cfg['validation']['val_every'] == 0:
+                val_loss = validate(cfg, E, D, val_data_loader,
+                        reconstruction_gen_loss, len(val_dataset),
+                        device)
                 if local_rank == 0:
-                    total_self_loss /= cfg['training']['log_every']
-                    total_gen_loss /= cfg['training']['log_every']
-                    total_match_loss /= cfg['training']['log_every']
-                    logger.add_scalar('Train_loss/self_reconstruction',
-                            total_self_loss, num_iter)
-                    logger.add_scalar('Train_loss/generative_reconstruction',
-                            total_gen_loss, num_iter)
-                    logger.add_scalar('Train_loss/feature_matching',
-                            total_match_loss, num_iter)
-                    total_self_loss = 0
-                    total_gen_loss = 0
-                    total_match_loss = 0
-
-            if (num_iter+1) % cfg['training']['checkpoint_every'] == 0:
-                torch.save(E.state_dict(),
-                        os.path.join(cfg['training']['checkpoint_dir'],f'Encoder_{num_iter}.pth'))
-                torch.save(D.state_dict(),
-                        os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_{num_iter}.pth'))
-
-            if cfg['validation']['do_validation']:
-                if (num_iter+1) % cfg['validation']['val_every'] == 0:
-                    val_loss = validate(cfg, E, D, val_data_loader,
-                            reconstruction_gen_loss, len(val_dataset),
-                            device)
                     logger.add_scalar('Validation_loss/generative_reconstruction',
                             val_loss, num_iter)
+
+        if (num_iter+1) % cfg['training']['checkpoint_every'] == 0:
+            torch.save(E.state_dict(),
+                    os.path.join(cfg['training']['checkpoint_dir'],f'Encoder_{num_iter}.pth'))
+            torch.save(D.state_dict(),
+                    os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_{num_iter}.pth'))
+
 
     torch.save(E.state_dict(),
             os.path.join(cfg['training']['checkpoint_dir'],f'Encoder_final.pth'))

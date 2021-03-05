@@ -1,4 +1,4 @@
-model_dir: test_run
+model_dir: run1
 model:
         encoder:
                 input_channels: 1
@@ -34,18 +34,18 @@ optimizer:
         learning_rate: .0001
         momentum: 0.9
 data:
-        train_dir: "/home/mifore/work/synth/adagan/chip_256/train"
-        val_dir: "/home/mifore/work/synth/adagan/chip_256/val"
+        train_dir: "/home/mifore/band2band/data/chip_256/train"
+        val_dir: "/home/mifore/band2band/data/chip_256/val"
         batch_size: 12
 validation:
         do_validation: true
-        val_every: 5
-        iterations: 10
-training:
+        val_every: 200
         iterations: 20
-        log_every: 5
-        log_directory: 'runs/run0'
-        checkpoint_every: 100
-        checkpoint_dir: 'checkpoints'
+training:
+        iterations: 10000
+        log_every: 20
+        log_directory: 'runs/run1'
+        checkpoint_every: 500
+        checkpoint_dir: 'run1/checkpoints'
 backend: 'nccl'
 device: 'cuda'
