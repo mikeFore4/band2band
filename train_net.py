@@ -445,12 +445,13 @@ def train(cfg, device, world_size, local_rank, distributed):
                 if local_rank == 0:
                     logger.add_scalar('Validation_loss/generative_reconstruction',
                             val_loss, num_iter)
-
-        if (num_iter+1) % cfg['training']['checkpoint_every'] == 0:
-            torch.save(E.state_dict(),
-                    os.path.join(cfg['training']['checkpoint_dir'],f'Encoder_{num_iter}.pth'))
-            torch.save(D.state_dict(),
-                    os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_{num_iter}.pth'))
+                    if (num_iter+1) == cfg['validation']['val_every']:
+                        best_val = val_loss
+                    if val_loss < best_val:
+                        torch.save(E.state_dict(),
+                                os.path.join(cfg['training']['checkpoint_dir'],f'Encoder_{num_iter}.pth'))
+                        torch.save(D.state_dict(),
+                                os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_{num_iter}.pth'))
 
 
     torch.save(E.state_dict(),

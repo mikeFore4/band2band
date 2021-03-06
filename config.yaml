@@ -45,7 +45,6 @@ training:
         iterations: 10000
         log_every: 20
         log_directory: 'runs/run1'
-        checkpoint_every: 500
         checkpoint_dir: 'run1/checkpoints'
 backend: 'nccl'
 device: 'cuda'
