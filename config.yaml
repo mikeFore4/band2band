@@ -21,7 +21,7 @@ model:
         input_channels: 128
         mode: bilinear
         num_classes: 14
-        outputs_channels: 1
+        output_channels: 1
         scale_factor: 2
         up_blocks: 3
         up_channel_divisor: 2
@@ -44,7 +44,7 @@ training:
     checkpoint_every: 50
     iterations: 500
     logging:
-            logger: aml
+            logger: tensorboard
             directory: logs/aml_test0
             log_every: 50
 validation:

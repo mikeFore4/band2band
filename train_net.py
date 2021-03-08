@@ -32,9 +32,6 @@ def get_config(config_file):
     return cfg
 
 def write_config(cfg):
-    if not os.path.exists(cfg['model_dir']):
-        os.mkdir(cfg['model_dir'])
-
     with open(os.path.join(cfg['model_dir'],'config.yaml'), 'w') as f:
         yaml.dump(cfg, f, indent=4)
 
@@ -382,7 +379,7 @@ def train(cfg, device, world_size, local_rank, distributed):
     total_gen_loss = 0
     total_match_loss = 0
     if not os.path.exists(cfg['training']['checkpoint_dir']):
-        os.mkdir(cfg['training']['checkpoint_dir'])
+        os.makedirs(cfg['training']['checkpoint_dir'])
 
     print('Beginning training')
     t_dl = iter(train_data_loader)
@@ -484,7 +481,7 @@ def train(cfg, device, world_size, local_rank, distributed):
 
 def run_training(cfg, local_rank):
     if not os.path.exists(cfg['model_dir']):
-        os.mkdir(cfg['model_dir'])
+        os.makedirs(cfg['model_dir'])
     write_config(cfg)
 
     device, world_size = get_device_information()
