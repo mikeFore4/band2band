@@ -483,7 +483,13 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config-file', required=True, type=str)
     parser.add_argument('--local_rank',default=0,type=int)
+    parser.add_argument('--data-folder',type=str)
 
     args = parser.parse_args()
 
-    run_training(**vars(args))
+    cfg = get_config(args.config_file)
+    if args.data_folder is not None:
+        cfg['data']['train_dir'] = os.path.join(args.data_folder,'train')
+        cfg['data']['val_dir'] = os.path.join(args.data_folder,'val')
+
+    run_training(cfg, args.local_rank)

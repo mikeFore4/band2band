@@ -34,18 +34,18 @@ model:
         input_channels: 1
         num_classes: 14
         pooling_factor: 2
-model_dir: /home/mifore/band2band/model_dir/run6/
+model_dir: /home/mifore/band2band/model_dir/aml_test0/
 optimizer:
-    algorithm: SGD
+    algorithm: adam
     learning_rate: 0.001
     momentum: 0.9
 training:
-    checkpoint_dir: /home/mifore/band2band/data/checkpoints/run6/
-    checkpoint_every: 1000
-    iterations: 15000
-    log_directory: runs/run6
+    checkpoint_dir: output/checkpoints/aml_test0/
+    checkpoint_every: 50
+    iterations: 500
+    log_directory: logs/aml_test0
     log_every: 50
 validation:
     do_validation: true
     iterations: 50
-    val_every: 200
+    val_every: 50
