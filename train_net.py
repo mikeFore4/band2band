@@ -460,8 +460,7 @@ def train(cfg, device, world_size, local_rank, distributed):
     torch.save(D.state_dict(),
             os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_final.pth'))
 
-def run_training(config_file, local_rank):
-    cfg = get_config(config_file)
+def run_training(cfg, local_rank):
     if not os.path.exists(cfg['model_dir']):
         os.mkdir(cfg['model_dir'])
     write_config(cfg)
