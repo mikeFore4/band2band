@@ -21,7 +21,7 @@ model:
         input_channels: 128
         mode: bilinear
         num_classes: 14
-        output_channels: 1
+        outputs_channels: 1
         scale_factor: 2
         up_blocks: 3
         up_channel_divisor: 2
@@ -34,17 +34,19 @@ model:
         input_channels: 1
         num_classes: 14
         pooling_factor: 2
-model_dir: /home/mifore/band2band/model_dir/aml_test0/
+model_dir: outputs/configs/aml_test0/
 optimizer:
     algorithm: adam
     learning_rate: 0.001
     momentum: 0.9
 training:
-    checkpoint_dir: output/checkpoints/aml_test0/
+    checkpoint_dir: outputs/checkpoints/aml_test0/
     checkpoint_every: 50
     iterations: 500
-    log_directory: logs/aml_test0
-    log_every: 50
+    logging:
+            logger: aml
+            directory: logs/aml_test0
+            log_every: 50
 validation:
     do_validation: true
     iterations: 50

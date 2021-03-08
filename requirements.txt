@@ -4,3 +4,4 @@ tqdm
 pyyaml
 tensorboard
 pillow
+azureml-core

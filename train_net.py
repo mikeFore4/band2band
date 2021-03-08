@@ -11,6 +11,7 @@ from torchvision import transforms
 from models import Encoder, Decoder
 from Band2BandDataset import Band2BandDataset
 from tqdm import tqdm
+from azureml.core.run import Run
 
 def get_config(config_file):
     """
@@ -31,6 +32,8 @@ def get_config(config_file):
     return cfg
 
 def write_config(cfg):
+    if not os.path.exists(cfg['model_dir']):
+        os.mkdir(cfg['model_dir'])
 
     with open(os.path.join(cfg['model_dir'],'config.yaml'), 'w') as f:
         yaml.dump(cfg, f, indent=4)
@@ -317,6 +320,25 @@ def validate(cfg, E, D, val_data_loader, reconstruction_gen_loss, dataset_len,
 
         return total_gen_loss
 
+def get_logger(cfg):
+    if cfg['training']['logging']['logger'] == 'tensorboard':
+        logger = SummaryWriter(cfg['training']['logging']['directory'])
+    elif cfg['training']['logging']['directory'] == 'aml':
+        logger = Run.get_context()
+    else:
+        raise NotImplementedError
+
+    return logger
+
+def log_metric(logger, cfg, name, val, num_iter):
+    if cfg['training']['logging']['logger'] == 'tensorboard':
+        logger.add_scalar(name, val, num_iter)
+    elif cfg['training']['logging']['logger'] == 'aml':
+        logger.log(name, val)
+    else:
+        raise NotImplementedError
+
+
 def train(cfg, device, world_size, local_rank, distributed):
     """
     Performs training of Encoder and Decoder modules
@@ -355,7 +377,7 @@ def train(cfg, device, world_size, local_rank, distributed):
     reconstruction_gen_loss = get_reconstruction_gen_loss(cfg)
     match_loss = get_feature_match_loss(cfg)
     if local_rank == 0:
-        logger = SummaryWriter(cfg['training']['log_directory'])
+        logger = get_logger(cfg)
     total_self_loss = 0
     total_gen_loss = 0
     total_match_loss = 0
@@ -423,16 +445,16 @@ def train(cfg, device, world_size, local_rank, distributed):
         #take optimization step
         optimizer.step()
 
-        if num_iter % cfg['training']['log_every'] == 0:
+        if num_iter % cfg['training']['logging']['log_every'] == 0:
             if local_rank == 0:
-                total_self_loss /= cfg['training']['log_every']
-                total_gen_loss /= cfg['training']['log_every']
-                total_match_loss /= cfg['training']['log_every']
-                logger.add_scalar('Train_loss/self_reconstruction',
+                total_self_loss /= cfg['training']['logging']['log_every']
+                total_gen_loss /= cfg['training']['logging']['log_every']
+                total_match_loss /= cfg['training']['logging']['log_every']
+                log_metric(logger, cfg, 'Train_loss/self_reconstruction',
                         total_self_loss, num_iter)
-                logger.add_scalar('Train_loss/generative_reconstruction',
+                log_metric(logger, cfg, 'Train_loss/generative_reconstruction',
                         total_gen_loss, num_iter)
-                logger.add_scalar('Train_loss/feature_matching',
+                log_metric(logger, cfg, 'Train_loss/feature_matching',
                         total_match_loss, num_iter)
                 total_self_loss = 0
                 total_gen_loss = 0
@@ -443,7 +465,7 @@ def train(cfg, device, world_size, local_rank, distributed):
                         reconstruction_gen_loss, len(val_dataset),
                         device)
                 if local_rank == 0:
-                    logger.add_scalar('Validation_loss/generative_reconstruction',
+                    log_metric(logger, cfg, 'Validation_loss/generative_reconstruction',
                             val_loss, num_iter)
                     if (num_iter+1) == cfg['validation']['val_every']:
                         best_val = val_loss
