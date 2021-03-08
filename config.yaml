@@ -1,50 +1,51 @@
-model_dir: run1
-model:
-        encoder:
-                input_channels: 1
-                down_blocks: 3
-                const_blocks: 2
-                pooling_factor: 2
-                first_out_channels: 32
-                down_channel_multiplier: 2
-                const_channel_multiplier: 1
-                num_classes: 14
-        decoder:
-                input_channels: 128
-                up_blocks: 3
-                const_blocks: 2
-                scale_factor: 2
-                mode: "bilinear"
-                up_channel_divisor: 2
-                const_channel_divisor: 2
-                output_channels: 1
-                num_classes: 14
-loss:
-        reconstruction_self: 
-                type: 'L2'
-                weight: 0.3
-        reconstruction_gen: 
-                type: 'L2'
-                weight: 0.5
-        matching: 
-                type: 'L2'
-                weight: 0.2
-optimizer: 
-        algorithm: "adam"
-        learning_rate: .0001
-        momentum: 0.9
+backend: nccl
 data:
-        train_dir: "/home/mifore/band2band/data/chip_256/train"
-        val_dir: "/home/mifore/band2band/data/chip_256/val"
-        batch_size: 12
-validation:
-        do_validation: true
-        val_every: 200
-        iterations: 20
+    batch_size: 12
+    train_dir: /home/mifore/band2band/data/chip_256/train
+    val_dir: /home/mifore/band2band/data/chip_256/val
+device: cuda
+loss:
+    matching:
+        type: L2
+        weight: 0.2
+    reconstruction_gen:
+        type: L2
+        weight: 0.5
+    reconstruction_self:
+        type: L2
+        weight: 0.3
+model:
+    decoder:
+        const_blocks: 2
+        const_channel_divisor: 2
+        input_channels: 128
+        mode: bilinear
+        num_classes: 14
+        output_channels: 1
+        scale_factor: 2
+        up_blocks: 3
+        up_channel_divisor: 2
+    encoder:
+        const_blocks: 2
+        const_channel_multiplier: 1
+        down_blocks: 3
+        down_channel_multiplier: 2
+        first_out_channels: 32
+        input_channels: 1
+        num_classes: 14
+        pooling_factor: 2
+model_dir: /home/mifore/band2band/model_dir/run6/
+optimizer:
+    algorithm: SGD
+    learning_rate: 0.001
+    momentum: 0.9
 training:
-        iterations: 10000
-        log_every: 20
-        log_directory: 'runs/run1'
-        checkpoint_dir: 'run1/checkpoints'
-backend: 'nccl'
-device: 'cuda'
+    checkpoint_dir: /home/mifore/band2band/data/checkpoints/run6/
+    checkpoint_every: 1000
+    iterations: 15000
+    log_directory: runs/run6
+    log_every: 50
+validation:
+    do_validation: true
+    iterations: 50
+    val_every: 200
