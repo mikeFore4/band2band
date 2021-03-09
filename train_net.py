@@ -499,7 +499,7 @@ def run_training(cfg, local_rank):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config-file', required=True, type=str)
+    parser.add_argument('--config-file', default='config.yaml', type=str)
     parser.add_argument('--local_rank',default=0,type=int)
     parser.add_argument('--data-path',type=str)
 
