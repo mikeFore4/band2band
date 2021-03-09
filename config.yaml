@@ -1,6 +1,6 @@
 backend: nccl
 data:
-    dir_head: /home/mifore/band2band
+    dir_head: /home/mifore/band2band/data/chip_256
     batch_size: 12
     train_csv: /home/mifore/band2band/data/chip_256/train_pairs.csv
     val_csv: /home/mifore/band2band/data/chip_256/val_pairs.csv
