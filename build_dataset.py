@@ -4,21 +4,22 @@ import argparse
 import csv
 from tqdm import tqdm
 
-def create_pair_csv(data_dir, output_path):
+def create_pair_csv(data_dir, sub, output_path):
     #extract all directories for common image filename stems
     image_groups = [os.path.join(data_dir,x) for x in os.listdir(data_dir)]
+    image_groups = [os.path.join(sub,x) for x in os.listdir(os.path.join(data_dir, sub))]
 
     #extract every tile directory
     tile_dirs = []
     for ig in image_groups:
-        tile_dirs.extend([os.path.join(ig,x) for x in os.listdir(ig)])
+        tile_dirs.extend([os.path.join(ig,x) for x in os.listdir(os.path.join(data_dir, ig))])
 
     #get all pairwise combinations of tiles of the same image
     pairs = []
     with open(output_path, 'w') as f:
         writer = csv.writer(f)
         for d in tqdm(tile_dirs):
-            fns = [os.path.join(d,x) for x in os.listdir(d)]
+            fns = [os.path.join(d,x) for x in os.listdir(os.path.join(data_dir, d)]
             perms = permutations(fns,2)
             for p in perms:
                 writer.writerow(p)
@@ -27,7 +28,7 @@ def process_dir(data_dir):
     subsets = os.listdir(data_dir)
 
     for sub in subsets:
-        create_pair_csv(os.path.join(data_dir, sub),
+        create_pair_csv(data_dir, sub,
                 os.path.join(data_dir,f'{sub}_pairs.csv'))
 
 if __name__=='__main__':
