@@ -2,10 +2,9 @@ import os
 from itertools import permutations
 import argparse
 import csv
+from tqdm import tqdm
 
 def create_pair_csv(data_dir, output_path):
-    print(data_dir)
-    print(output_path)
     #extract all directories for common image filename stems
     image_groups = [os.path.join(data_dir,x) for x in os.listdir(data_dir)]
 
@@ -18,7 +17,7 @@ def create_pair_csv(data_dir, output_path):
     pairs = []
     with open(output_path, 'w') as f:
         writer = csv.writer(f)
-        for d in tile_dirs:
+        for d in tqdm(tile_dirs):
             fns = [os.path.join(d,x) for x in os.listdir(d)]
             perms = permutations(fns,2)
             for p in perms:
