@@ -501,13 +501,18 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config-file', required=True, type=str)
     parser.add_argument('--local_rank',default=0,type=int)
-    parser.add_argument('--data-folder',type=str)
+    parser.add_argument('--train-csv',type=str)
+    parser.add_argument('--val-csv',type=str)
+    parser.add_argument('--data-path',type=str)
 
     args = parser.parse_args()
 
     cfg = get_config(args.config_file)
-    if args.data_folder is not None:
-        cfg['data']['train_dir'] = os.path.join(args.data_folder,'train')
-        cfg['data']['val_dir'] = os.path.join(args.data_folder,'val')
+    if args.data_path is not None:
+        cfg['data']['dir_head'] = args.data_path
+    if args.train_csv is not None:
+        cfg['data']['train_csv'] = args.train_csv
+    if args.val_csv is not None:
+        cfg['data']['val_csv'] = args.val_csv
 
     run_training(cfg, args.local_rank)
