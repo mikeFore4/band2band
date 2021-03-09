@@ -27,6 +27,7 @@ class Band2BandDataset(Dataset):
         """
 
         super(Band2BandDataset, self).__init__()
+        csv_path = os.path.join(data_directory_head, csv_path)
         df = pd.read_csv(csv_path, header=None)
         self.first_in_pair = df[0].tolist()
         self.second_in_pair = df[1].tolist()
