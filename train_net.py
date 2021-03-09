@@ -96,7 +96,7 @@ def get_train_loader(cfg, world_size, distributed):
     trans = transforms.Compose([
                         transforms.ToTensor()
                         ])
-    train_dataset = Band2BandDataset(cfg['data']['train_dir'],trans)
+    train_dataset = Band2BandDataset(cfg['data']['dir_head'],cfg['data']['train_csv'],trans)
 
     #setup samplers
     if distributed:
@@ -140,7 +140,7 @@ def get_val_loader(cfg, world_size, distributed):
     trans = transforms.Compose([
                         transforms.ToTensor()
                         ])
-    val_dataset = Band2BandDataset(cfg['data']['val_dir'],trans)
+    val_dataset = Band2BandDataset(cfg['data']['dir_head'],cfg['data']['val_csv'],trans)
 
     #setup samplers
     if distributed:

@@ -3,6 +3,7 @@ import os
 from PIL import Image
 import torch
 from itertools import permutations
+import pandas as pd
 
 class Band2BandDataset(Dataset):
     """
@@ -11,7 +12,7 @@ class Band2BandDataset(Dataset):
         <head_directory>/<common_file_stem>/<tile_number>/<band_number.tif>
     """
 
-    def __init__(self, data_directory, transform=None):
+    def __init__(self, data_directory_head, csv_path=None, transform=None):
         """
         Initializer for Band2BandDataset
 
@@ -26,31 +27,24 @@ class Band2BandDataset(Dataset):
         """
 
         super(Band2BandDataset, self).__init__()
+        df = pd.read_csv(csv_path, header=None)
+        self.first_in_pair = df[0].tolist()
+        self.second_in_pair = df[1].tolist()
+        self.data_directory_head = data_directory_head
 
-        #extract all directories for common image filename stems
-        image_groups = [os.path.join(data_directory,x) for x in
-                os.listdir(data_directory)]
-        #extract every tile directory
-        tile_dirs = []
-        for ig in image_groups:
-            tile_dirs.extend([os.path.join(ig,x) for x in os.listdir(ig)])
-
-        #get all pairwise combinations of tiles of the same image
-        pairs = []
-        for d in tile_dirs:
-            fns = [os.path.join(d,x) for x in os.listdir(d)]
-            pairs.extend(permutations(fns,2))
-        self.pairs = pairs
         self.transform = transform
 
     def __len__(self):
-        return len(self.pairs)
+        return len(self.first_in_pair)
 
     def __getitem__(self, idx):
-        pair = self.pairs[idx]
+
+        first = os.path.join(self.data_directory_head, self.first_in_pair[idx])
+        second = os.path.join(self.data_directory_head, self.second_in_pair[idx])
+
         classes = []
         imgs = []
-        for fn in pair:
+        for fn in [first,second]:
             img = Image.open(fn)
             if self.transform:
                 img = self.transform(img)

@@ -5,3 +5,4 @@ pyyaml
 tensorboard
 pillow
 azureml-core
+pandas

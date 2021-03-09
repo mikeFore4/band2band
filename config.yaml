@@ -1,8 +1,9 @@
 backend: nccl
 data:
+    dir_head: /home/mifore/band2band
     batch_size: 12
-    train_dir: /home/mifore/band2band/data/chip_256/train
-    val_dir: /home/mifore/band2band/data/chip_256/val
+    train_csv: /home/mifore/band2band/data/chip_256/train_pairs.csv
+    val_csv: /home/mifore/band2band/data/chip_256/val_pairs.csv
 device: cuda
 loss:
     matching:
