@@ -45,7 +45,7 @@ training:
     checkpoint_every: 50
     iterations: 500
     logging:
-            logger: tensorboard
+            logger: aml
             directory: logs/aml_test0
             log_every: 50
 validation:
