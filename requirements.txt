@@ -5,4 +5,5 @@ pyyaml
 tensorboard
 pillow
 azureml-core
+azureml-dataset-runtime
 pandas

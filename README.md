@@ -1,4 +1,4 @@
-# Adaptive AutoEncoders for Class Conditional Image to Image Translation
+# Denormalization Embedded AutoEncoders for Class Conditional Image to Image Translation
 
 ## Overview
 This repo contains a novel approach to image to image translation, specifically to be applied to the problem of translating images from one band of HLS data to another (for example, near infrared to the cirrus band). In this data, there are 14 distinct bands.
@@ -18,3 +18,8 @@ Validation can be performed during training or separately. To perform a separate
 ```
 python -m torch.distributed.launch --nprocs_per_node=<num_gpus_per_node> test_net.py --config-file=<path/to/config.yaml>
 ```
+For inference, you need to provide a folder containing all the input images which need to be of the same input class. Then perform the following:
+```
+python inference.py --config-file=<path/to/config.yaml> --input-dir=<path/to/input/images> --output-dir=<path/to/write/images> --input-class=<int> --output-class=<int>
+```
+This inference script can also be run in distributed mode with torch.distributed.launch. There is probably a better way to implement the inference script so it doesn't have to run separately for each class transition, but that would likely require an input dict from the user to map which images to translate to which classes. We will explore inputs like this at a later date.

@@ -1,7 +1,7 @@
 backend: nccl
 data:
-    dir_head: /home/mifore/band2band/data/chip_256
     batch_size: 12
+    dir_head: /home/mifore/band2bad/data/chip_256
     train_csv: train_pairs.csv
     val_csv: val_pairs.csv
 device: cuda
@@ -35,20 +35,22 @@ model:
         input_channels: 1
         num_classes: 14
         pooling_factor: 2
-model_dir: outputs/configs/aml_test0/
+model_dir: models/run0
 optimizer:
     algorithm: adam
     learning_rate: 0.001
     momentum: 0.9
 training:
-    checkpoint_dir: outputs/checkpoints/aml_test0/
-    checkpoint_every: 50
-    iterations: 500
+    checkpoint_dir: /home/mifore/data/checkpoints/run0
+    iterations: 30000
     logging:
-            logger: aml
-            directory: logs/aml_test0
-            log_every: 50
+        directory: logs/run0
+        log_every: 50
+        logger: tensorboard
 validation:
     do_validation: true
     iterations: 50
-    val_every: 50
+    val_every: 200
+checkpoint:
+    encoder: Encoder_final.pth
+    decoder: Decoder_final.pth
