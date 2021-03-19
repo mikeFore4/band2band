@@ -191,7 +191,8 @@ def train(cfg, device, world_size, local_rank, distributed):
 def run_training(cfg, local_rank):
     os.makedirs(cfg['model_dir'], exist_ok = True)
     utils.write_config(cfg)
-    set_environment_variables()
+    if cfg['use_aml']:
+        set_environment_variables()
 
     device, world_size = utils.get_device_information()
     distributed = world_size > 1

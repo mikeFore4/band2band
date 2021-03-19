@@ -54,3 +54,4 @@ validation:
 checkpoint:
     encoder: Encoder_final.pth
     decoder: Decoder_final.pth
+use_aml: true
