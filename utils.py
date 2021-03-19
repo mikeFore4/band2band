@@ -2,10 +2,13 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
+from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 import yaml
+import os
 from models import Encoder, Decoder
 from Band2BandDataset import Band2BandDataset
+from azureml.core.run import Run
 
 def get_config(config_file):
     """
@@ -191,4 +194,106 @@ def get_reconstruction_gen_loss(cfg):
         raise NotImplementedError
 
     return loss
+
+def write_config(cfg):
+    with open(os.path.join(cfg['model_dir'],'config.yaml'), 'w') as f:
+        yaml.dump(cfg, f, indent=4)
+
+def get_optimizer(cfg, E, D):
+    """
+    Creates torch optimizers for Encoder and Decoder models
+
+    Inputs
+    ------
+    cfg : dict
+    E : Encoder
+    D : Decoder
+
+    Outputs
+    -------
+    torch optimizer
+    """
+
+    if cfg['optimizer']['algorithm'].lower() == 'adam':
+        optimizer = torch.optim.Adam(
+                list(E.parameters())+list(D.parameters()),
+                lr=cfg['optimizer']['learning_rate']
+                )
+    elif cfg['optimizer']['algorithm'].lower() == 'sgd':
+        optimizer = torch.optim.SGD(
+                list(E.parameters())+list(D.parameters()),
+                lr=cfg['optimizer']['learning_rate'],
+                momentum=cfg['optimizer']['momentum']
+                )
+    else:
+        raise NotImplementedError
+
+    return optimizer
+
+def get_reconstruction_self_loss(cfg):
+    """
+    Uses config to decide which type of loss to use for self reconstruction
+    (meaning we are trying to reconstruct the original using the decoder)
+
+    Inputs
+    ------
+    cfg : dict
+
+    Outputs
+    -------
+    torch loss module
+    """
+
+    if cfg['loss']['reconstruction_self']['type'] == 'L1':
+        loss = nn.L1Loss()
+    elif cfg['loss']['reconstruction_self']['type'] == 'L2':
+        loss = nn.MSELoss()
+    elif cfg['loss']['reconstruction_self']['type'] == 'Perceptual':
+        raise NotImplementedError
+    else:
+        raise NotImplementedError
+
+    return loss
+
+def get_feature_match_loss(cfg):
+    """
+    Uses config to decide which type of loss to use for feature matching of
+    intermediate features output from the encoder for multiple bands of the
+    same image
+
+    Inputs
+    ------
+    cfg : dict
+
+    Outputs
+    -------
+    torch loss module
+    """
+
+    if cfg['loss']['matching']['type'] == 'L1':
+        loss = nn.L1Loss()
+    elif cfg['loss']['matching']['type'] == 'L2':
+        loss = nn.MSELoss()
+    else:
+        raise NotImplementedError
+
+    return loss
+
+def get_logger(cfg):
+    if cfg['training']['logging']['logger'] == 'tensorboard':
+        logger = SummaryWriter(cfg['training']['logging']['directory'])
+    elif cfg['training']['logging']['directory'] == 'aml':
+        logger = Run.get_context()
+    else:
+        raise NotImplementedError
+
+    return logger
+
+def log_metric(logger, cfg, name, val, num_iter):
+    if cfg['training']['logging']['logger'] == 'tensorboard':
+        logger.add_scalar(name, val, num_iter)
+    elif cfg['training']['logging']['logger'] == 'aml':
+        logger.log(name, val)
+    else:
+        raise NotImplementedError
 

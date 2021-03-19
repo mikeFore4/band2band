@@ -46,7 +46,7 @@ training:
     logging:
         directory: logs/run0
         log_every: 50
-        logger: tensorboard
+        logger: aml
 validation:
     do_validation: true
     iterations: 50

@@ -5,7 +5,8 @@ from azureml.core import Environment
 from azureml.core import ScriptRunConfig
 from azureml.core import Dataset
 from azureml.core.compute import ComputeInstance
-from azureml.core.runconfig import PyTorchConfiguration
+#from azureml.core.runconfig import PyTorchConfiguration
+from azureml.core.runconfig import MpiConfiguration
 
 #access aml workspace
 ws = Workspace.from_config('aml_config.json')
@@ -29,8 +30,9 @@ dataset = Dataset.get_by_name(ws, name='b2b')
 #dataset = Dataset.File.from_files(path=(datastore, 'datasets/b2b'))
 
 #setup up for distributed training
-distr_config = PyTorchConfiguration(node_count=1)
+#distr_config = PyTorchConfiguration(node_count=1)
 #launch_cmd = f"python -m torch.distributed.launch --nproc_per_node=4 train_net.py --data-path={dataset.as_mount()}".split()
+distr_config = MpiConfiguration(process_count_per_node=4, node_count=1)
 
 #create training run
 src = ScriptRunConfig(source_directory='/home/mifore/work/synth/adagan',

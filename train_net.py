@@ -1,97 +1,11 @@
-import yaml
 import os
 import argparse
 import torch
 import torch.distributed as dist
-from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 from tqdm import tqdm
-from azureml.core.run import Run
-from utils import *
-
-def write_config(cfg):
-    with open(os.path.join(cfg['model_dir'],'config.yaml'), 'w') as f:
-        yaml.dump(cfg, f, indent=4)
-
-def get_optimizer(cfg, E, D):
-    """
-    Creates torch optimizers for Encoder and Decoder models
-
-    Inputs
-    ------
-    cfg : dict
-    E : Encoder
-    D : Decoder
-
-    Outputs
-    -------
-    torch optimizer
-    """
-
-    if cfg['optimizer']['algorithm'].lower() == 'adam':
-        optimizer = torch.optim.Adam(
-                list(E.parameters())+list(D.parameters()),
-                lr=cfg['optimizer']['learning_rate']
-                )
-    elif cfg['optimizer']['algorithm'].lower() == 'sgd':
-        optimizer = torch.optim.SGD(
-                list(E.parameters())+list(D.parameters()),
-                lr=cfg['optimizer']['learning_rate'],
-                momentum=cfg['optimizer']['momentum']
-                )
-    else:
-        raise NotImplementedError
-
-    return optimizer
-
-def get_reconstruction_self_loss(cfg):
-    """
-    Uses config to decide which type of loss to use for self reconstruction
-    (meaning we are trying to reconstruct the original using the decoder)
-
-    Inputs
-    ------
-    cfg : dict
-
-    Outputs
-    -------
-    torch loss module
-    """
-
-    if cfg['loss']['reconstruction_self']['type'] == 'L1':
-        loss = nn.L1Loss()
-    elif cfg['loss']['reconstruction_self']['type'] == 'L2':
-        loss = nn.MSELoss()
-    elif cfg['loss']['reconstruction_self']['type'] == 'Perceptual':
-        raise NotImplementedError
-    else:
-        raise NotImplementedError
-
-    return loss
-
-def get_feature_match_loss(cfg):
-    """
-    Uses config to decide which type of loss to use for feature matching of
-    intermediate features output from the encoder for multiple bands of the
-    same image
-
-    Inputs
-    ------
-    cfg : dict
-
-    Outputs
-    -------
-    torch loss module
-    """
-
-    if cfg['loss']['matching']['type'] == 'L1':
-        loss = nn.L1Loss()
-    elif cfg['loss']['matching']['type'] == 'L2':
-        loss = nn.MSELoss()
-    else:
-        raise NotImplementedError
-
-    return loss
+import utils
+from azureml_env_adapter import set_environment_variables
 
 def validate(cfg, E, D, val_data_loader, reconstruction_gen_loss, dataset_len,
         device):
@@ -132,24 +46,6 @@ def validate(cfg, E, D, val_data_loader, reconstruction_gen_loss, dataset_len,
 
         return total_gen_loss
 
-def get_logger(cfg):
-    if cfg['training']['logging']['logger'] == 'tensorboard':
-        logger = SummaryWriter(cfg['training']['logging']['directory'])
-    elif cfg['training']['logging']['directory'] == 'aml':
-        logger = Run.get_context()
-    else:
-        raise NotImplementedError
-
-    return logger
-
-def log_metric(logger, cfg, name, val, num_iter):
-    if cfg['training']['logging']['logger'] == 'tensorboard':
-        logger.add_scalar(name, val, num_iter)
-    elif cfg['training']['logging']['logger'] == 'aml':
-        logger.log(name, val)
-    else:
-        raise NotImplementedError
-
 def train(cfg, device, world_size, local_rank, distributed):
     """
     Performs training of Encoder and Decoder modules
@@ -164,7 +60,7 @@ def train(cfg, device, world_size, local_rank, distributed):
 
     #initialize encoder
     print('Initializing Encoder')
-    E = get_encoder(cfg)
+    E = utils.get_encoder(cfg)
     E = E.to(device)
     if distributed:
         E = nn.parallel.DistributedDataParallel(E, device_ids=[local_rank],
@@ -172,28 +68,27 @@ def train(cfg, device, world_size, local_rank, distributed):
 
     #initialize decoder
     print('Initializing Decoder')
-    D = get_decoder(cfg)
+    D = utils.get_decoder(cfg)
     D = D.to(device)
     if distributed:
         D = nn.parallel.DistributedDataParallel(D, device_ids=[local_rank],
                 output_device=local_rank)
 
     print('Building dataloaders')
-    train_dataset, train_data_loader = get_train_loader(cfg, world_size, distributed)
+    train_dataset, train_data_loader = utils.get_train_loader(cfg, world_size, distributed)
     if cfg['validation']['do_validation']:
-        val_dataset, val_data_loader = get_val_loader(cfg, world_size,
+        val_dataset, val_data_loader = utils.get_val_loader(cfg, world_size,
                 distributed)
-    optimizer = get_optimizer(cfg, E, D)
-    reconstruction_self_loss = get_reconstruction_self_loss(cfg)
-    reconstruction_gen_loss = get_reconstruction_gen_loss(cfg)
-    match_loss = get_feature_match_loss(cfg)
+    optimizer = utils.get_optimizer(cfg, E, D)
+    reconstruction_self_loss = utils.get_reconstruction_self_loss(cfg)
+    reconstruction_gen_loss = utils.get_reconstruction_gen_loss(cfg)
+    match_loss = utils.get_feature_match_loss(cfg)
     if local_rank == 0:
-        logger = get_logger(cfg)
+        logger = utils.get_logger(cfg)
     total_self_loss = 0
     total_gen_loss = 0
     total_match_loss = 0
-    if not os.path.exists(cfg['training']['checkpoint_dir']):
-        os.makedirs(cfg['training']['checkpoint_dir'])
+    os.makedirs(cfg['training']['checkpoint_dir'], exist_ok = True)
 
     print('Beginning training')
     t_dl = iter(train_data_loader)
@@ -261,11 +156,11 @@ def train(cfg, device, world_size, local_rank, distributed):
                 total_self_loss /= cfg['training']['logging']['log_every']
                 total_gen_loss /= cfg['training']['logging']['log_every']
                 total_match_loss /= cfg['training']['logging']['log_every']
-                log_metric(logger, cfg, 'Train_loss/self_reconstruction',
+                utils.log_metric(logger, cfg, 'Train_loss/self_reconstruction',
                         total_self_loss, num_iter)
-                log_metric(logger, cfg, 'Train_loss/generative_reconstruction',
+                utils.log_metric(logger, cfg, 'Train_loss/generative_reconstruction',
                         total_gen_loss, num_iter)
-                log_metric(logger, cfg, 'Train_loss/feature_matching',
+                utils.log_metric(logger, cfg, 'Train_loss/feature_matching',
                         total_match_loss, num_iter)
                 total_self_loss = 0
                 total_gen_loss = 0
@@ -276,7 +171,7 @@ def train(cfg, device, world_size, local_rank, distributed):
                         reconstruction_gen_loss, len(val_dataset),
                         device)
                 if local_rank == 0:
-                    log_metric(logger, cfg, 'Validation_loss/generative_reconstruction',
+                    utils.log_metric(logger, cfg, 'Validation_loss/generative_reconstruction',
                             val_loss, num_iter)
                     if (num_iter+1) == cfg['validation']['val_every']:
                         best_val = val_loss
@@ -294,17 +189,17 @@ def train(cfg, device, world_size, local_rank, distributed):
             os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_final.pth'))
 
 def run_training(cfg, local_rank):
-    if not os.path.exists(cfg['model_dir']):
-        os.makedirs(cfg['model_dir'])
-    write_config(cfg)
+    os.makedirs(cfg['model_dir'], exist_ok = True)
+    utils.write_config(cfg)
+    set_environment_variables()
 
-    device, world_size = get_device_information()
+    device, world_size = utils.get_device_information()
     distributed = world_size > 1
 
     if distributed:
         torch.cuda.set_device(local_rank)
         dist.init_process_group(cfg['backend'], rank=local_rank,
-                world_size=world_size)
+                world_size=world_size, init_method='env://')
     else:
         world_size = 1
         local_rank = 0
@@ -319,7 +214,7 @@ if __name__=='__main__':
 
     args = parser.parse_args()
 
-    cfg = get_config(args.config_file)
+    cfg = utils.get_config(args.config_file)
     if args.data_path is not None:
         cfg['data']['dir_head'] = args.data_path
 
