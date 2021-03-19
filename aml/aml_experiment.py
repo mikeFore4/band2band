@@ -9,7 +9,7 @@ from azureml.core.compute import ComputeInstance
 from azureml.core.runconfig import MpiConfiguration
 
 #access aml workspace
-ws = Workspace.from_config('aml_config.json')
+ws = Workspace.from_config('aml/aml_config.json')
 
 #create experiment
 experiment_name = 'test_run'
