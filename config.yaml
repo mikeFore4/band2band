@@ -35,13 +35,13 @@ model:
         input_channels: 1
         num_classes: 14
         pooling_factor: 2
-model_dir: models/run0
+model_dir: outputs/run0
 optimizer:
     algorithm: adam
     learning_rate: 0.001
     momentum: 0.9
 training:
-    checkpoint_dir: /home/mifore/data/checkpoints/run0
+    checkpoint_dir: outputs/run0/checkpoints/
     iterations: 30000
     logging:
         directory: logs/run0

@@ -3,7 +3,7 @@ import argparse
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from tqdm import tqdm
+#from tqdm import tqdm
 import utils
 from azureml_env_adapter import set_environment_variables
 
@@ -93,7 +93,8 @@ def train(cfg, device, world_size, local_rank, distributed):
     print('Beginning training')
     t_dl = iter(train_data_loader)
     train_ds_len = len(train_dataset)
-    for num_iter in tqdm(range(cfg['training']['iterations'])):
+    #for num_iter in tqdm(range(cfg['training']['iterations'])):
+    for num_iter in range(cfg['training']['iterations']):
         if num_iter % train_ds_len == 0:
             t_dl = iter(train_data_loader)
         imgs, labels = t_dl.next()
@@ -178,9 +179,9 @@ def train(cfg, device, world_size, local_rank, distributed):
                     if val_loss < best_val:
                         best_val = val_loss
                         torch.save(E.state_dict(),
-                                os.path.join(cfg['training']['checkpoint_dir'],f'Encoder_{num_iter}.pth'))
+                                os.path.join(cfg['training']['checkpoint_dir'],f'Encoder_best.pth'))
                         torch.save(D.state_dict(),
-                                os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_{num_iter}.pth'))
+                                os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_best.pth'))
 
 
     torch.save(E.state_dict(),
@@ -191,8 +192,6 @@ def train(cfg, device, world_size, local_rank, distributed):
 def run_training(cfg, local_rank):
     os.makedirs(cfg['model_dir'], exist_ok = True)
     utils.write_config(cfg)
-    if cfg['use_aml']:
-        set_environment_variables()
 
     device, world_size = utils.get_device_information()
     distributed = world_size > 1

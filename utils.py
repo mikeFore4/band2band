@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 import yaml
 import os
@@ -281,8 +281,9 @@ def get_feature_match_loss(cfg):
 
 def get_logger(cfg):
     if cfg['training']['logging']['logger'] == 'tensorboard':
-        logger = SummaryWriter(cfg['training']['logging']['directory'])
-    elif cfg['training']['logging']['directory'] == 'aml':
+        #logger = SummaryWriter(cfg['training']['logging']['directory'])
+        logger = None
+    elif cfg['training']['logging']['logger'] == 'aml':
         logger = Run.get_context()
     else:
         raise NotImplementedError
