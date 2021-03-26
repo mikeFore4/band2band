@@ -200,7 +200,7 @@ if __name__=='__main__':
     parser.add_argument('--config-file', default='config.yaml', type=str)
     parser.add_argument('--data-path',type=str)
     parser.add_argument('--nodes', default=1,type=int)
-    parser.add_argument('--node-size', type=1, type=int)
+    parser.add_argument('--node-size', default=1, type=int)
     parser.add_argument('--node-rank', default=0, type=int)
 
     args = parser.parse_args()
@@ -211,7 +211,7 @@ if __name__=='__main__':
     if args.data_path is not None:
         cfg['data']['dir_head'] = args.data_path
 
-    os.environ['WORLD_SIZE'] = args.node_size * args.nodes
+    world_size = args.node_size * args.nodes
 
     mp.spawn(train, nprocs=args.node_size, args=(cfg, world_size,
         args.node_rank, args.node_size))
