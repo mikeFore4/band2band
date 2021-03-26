@@ -9,6 +9,7 @@ import os
 from models import Encoder, Decoder
 from Band2BandDataset import Band2BandDataset
 from azureml.core.run import Run
+#import mlflow
 
 def get_config(config_file):
     """
@@ -77,7 +78,7 @@ def get_device_information():
 
     return device, world_size
 
-def get_train_loader(cfg, world_size, distributed):
+def get_train_loader(cfg, world_size, distributed, rank):
     """
     Prepares data loaders from config. Dataloaders are designed to be used with
     torch.nn.parallel.DistributedDataParallel
@@ -105,7 +106,9 @@ def get_train_loader(cfg, world_size, distributed):
 
     #setup samplers
     if distributed:
-        train_sampler = DistributedSampler(train_dataset)
+        train_sampler = DistributedSampler(train_dataset,
+                num_replicas=world_size,
+                rank=rank)
 
     #setup dataloaders
     if distributed:
@@ -123,7 +126,7 @@ def get_train_loader(cfg, world_size, distributed):
 
     return train_dataset, train_dl
 
-def get_val_loader(cfg, world_size, distributed):
+def get_val_loader(cfg, world_size, distributed, rank):
     """
     Prepares data loaders from config. Dataloaders are designed to be used with
     torch.nn.parallel.DistributedDataParallel
@@ -151,7 +154,9 @@ def get_val_loader(cfg, world_size, distributed):
 
     #setup samplers
     if distributed:
-        val_sampler = DistributedSampler(val_dataset)
+        val_sampler = DistributedSampler(val_dataset,
+                                    num_replicas=world_size,
+                                    rank=rank)
 
     #setup dataloaders
     if distributed:
@@ -284,7 +289,11 @@ def get_logger(cfg):
         #logger = SummaryWriter(cfg['training']['logging']['directory'])
         logger = None
     elif cfg['training']['logging']['logger'] == 'aml':
-        logger = Run.get_context()
+        run = Run.get_context()
+        #ws = run.experiment.workspace
+        #mlflow.set_tracking_uri(ws.get_mlflow_tracking_uri())
+        #logger = mlflow
+        logger = run
     else:
         raise NotImplementedError
 
@@ -294,7 +303,7 @@ def log_metric(logger, cfg, name, val, num_iter):
     if cfg['training']['logging']['logger'] == 'tensorboard':
         logger.add_scalar(name, val, num_iter)
     elif cfg['training']['logging']['logger'] == 'aml':
-        logger.log(name, val)
+        logger.log_metric(name, val)
     else:
         raise NotImplementedError
 

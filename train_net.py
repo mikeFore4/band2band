@@ -2,6 +2,7 @@ import os
 import argparse
 import torch
 import torch.distributed as dist
+import torch.multiprocessing as mp
 import torch.nn as nn
 #from tqdm import tqdm
 import utils
@@ -46,7 +47,7 @@ def validate(cfg, E, D, val_data_loader, reconstruction_gen_loss, dataset_len,
 
         return total_gen_loss
 
-def train(cfg, device, world_size, local_rank, distributed):
+def train(gpu, cfg, world_size, node_rank, node_size, distributed=True):
     """
     Performs training of Encoder and Decoder modules
 
@@ -58,32 +59,37 @@ def train(cfg, device, world_size, local_rank, distributed):
         rank number of master process for distributed training
     """
 
+    rank = node_rank * node_size + gpu
+    device = gpu
+    torch.cuda.set_device(gpu)
+    dist.init_process_group(cfg['backend'], rank=rank,
+            world_size=world_size, init_method='env://')
+
     #initialize encoder
     print('Initializing Encoder')
     E = utils.get_encoder(cfg)
     E = E.to(device)
     if distributed:
-        E = nn.parallel.DistributedDataParallel(E, device_ids=[local_rank],
-                output_device=local_rank)
+        E = nn.parallel.DistributedDataParallel(E, device_ids=[gpu])
 
     #initialize decoder
     print('Initializing Decoder')
     D = utils.get_decoder(cfg)
     D = D.to(device)
     if distributed:
-        D = nn.parallel.DistributedDataParallel(D, device_ids=[local_rank],
-                output_device=local_rank)
+        D = nn.parallel.DistributedDataParallel(D, device_ids=[gpu])
 
     print('Building dataloaders')
-    train_dataset, train_data_loader = utils.get_train_loader(cfg, world_size, distributed)
+    train_dataset, train_data_loader = utils.get_train_loader(cfg, world_size,
+            distributed, rank)
     if cfg['validation']['do_validation']:
         val_dataset, val_data_loader = utils.get_val_loader(cfg, world_size,
-                distributed)
+                distributed, rank)
     optimizer = utils.get_optimizer(cfg, E, D)
     reconstruction_self_loss = utils.get_reconstruction_self_loss(cfg)
     reconstruction_gen_loss = utils.get_reconstruction_gen_loss(cfg)
     match_loss = utils.get_feature_match_loss(cfg)
-    if local_rank == 0:
+    if rank == 0:
         logger = utils.get_logger(cfg)
     total_self_loss = 0
     total_gen_loss = 0
@@ -153,7 +159,7 @@ def train(cfg, device, world_size, local_rank, distributed):
         optimizer.step()
 
         if num_iter % cfg['training']['logging']['log_every'] == 0:
-            if local_rank == 0:
+            if rank == 0:
                 total_self_loss /= cfg['training']['logging']['log_every']
                 total_gen_loss /= cfg['training']['logging']['log_every']
                 total_match_loss /= cfg['training']['logging']['log_every']
@@ -171,7 +177,7 @@ def train(cfg, device, world_size, local_rank, distributed):
                 val_loss = validate(cfg, E, D, val_data_loader,
                         reconstruction_gen_loss, len(val_dataset),
                         device)
-                if local_rank == 0:
+                if rank == 0:
                     utils.log_metric(logger, cfg, 'Validation_loss/generative_reconstruction',
                             val_loss, num_iter)
                     if (num_iter+1) == cfg['validation']['val_every']:
@@ -189,33 +195,24 @@ def train(cfg, device, world_size, local_rank, distributed):
     torch.save(D.state_dict(),
             os.path.join(cfg['training']['checkpoint_dir'],f'Decoder_final.pth'))
 
-def run_training(cfg, local_rank):
-    os.makedirs(cfg['model_dir'], exist_ok = True)
-    utils.write_config(cfg)
-
-    device, world_size = utils.get_device_information()
-    distributed = world_size > 1
-
-    if distributed:
-        torch.cuda.set_device(local_rank)
-        dist.init_process_group(cfg['backend'], rank=local_rank,
-                world_size=world_size, init_method='env://')
-    else:
-        world_size = 1
-        local_rank = 0
-
-    train(cfg, device, world_size, local_rank, distributed)
-
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config-file', default='config.yaml', type=str)
-    parser.add_argument('--local_rank',default=0,type=int)
     parser.add_argument('--data-path',type=str)
+    parser.add_argument('--nodes', default=1,type=int)
+    parser.add_argument('--node-size', type=1, type=int)
+    parser.add_argument('--node-rank', default=0, type=int)
 
     args = parser.parse_args()
 
     cfg = utils.get_config(args.config_file)
+    os.makedirs(cfg['model_dir'], exist_ok = True)
+    utils.write_config(cfg)
     if args.data_path is not None:
         cfg['data']['dir_head'] = args.data_path
 
-    run_training(cfg, args.local_rank)
+    os.environ['WORLD_SIZE'] = args.node_size * args.nodes
+
+    mp.spawn(train, nprocs=args.node_size, args=(cfg, world_size,
+        args.node_rank, args.node_size))
+
