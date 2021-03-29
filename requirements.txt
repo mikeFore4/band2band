@@ -7,3 +7,4 @@ pillow
 azureml-core
 azureml-dataset-runtime
 pandas
+azureml-mlflow

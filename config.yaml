@@ -4,17 +4,17 @@ data:
     dir_head: /home/mifore/band2bad/data/chip_256
     train_csv: train_pairs.csv
     val_csv: val_pairs.csv
-device: cuda
+    num_workers: 4
 loss:
     matching:
         type: L2
-        weight: 0.2
+        weight: 0.0
     reconstruction_gen:
         type: L2
-        weight: 0.5
+        weight: 1.0
     reconstruction_self:
         type: L2
-        weight: 0.3
+        weight: 0.0
 model:
     decoder:
         const_blocks: 2
@@ -36,22 +36,31 @@ model:
         num_classes: 14
         pooling_factor: 2
 model_dir: outputs/run0
-optimizer:
-    algorithm: adam
-    learning_rate: 0.001
-    momentum: 0.9
 training:
+    optimizer:
+        algorithm: adam
+        learning_rate: 0.001
+        momentum: 0.9
     checkpoint_dir: outputs/run0/checkpoints/
-    iterations: 30000
+    iterations: 30
     logging:
         directory: logs/run0
-        log_every: 50
+        log_every: 5
         logger: aml
 validation:
     do_validation: true
-    iterations: 50
-    val_every: 200
+    iterations: 10
+    val_every: 10
 checkpoint:
     encoder: Encoder_final.pth
     decoder: Decoder_final.pth
-use_aml: true
+aml:
+    use_aml: true
+    aml_config: aml/aml_config.json
+    experiment_name: debugging
+    compute:
+        use_instance: false
+        name: gpu-cluster
+    process_count: 4
+    node_count: 2
+    dataset: b2b

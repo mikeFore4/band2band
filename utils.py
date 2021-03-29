@@ -9,6 +9,7 @@ import os
 from models import Encoder, Decoder
 from Band2BandDataset import Band2BandDataset
 from azureml.core.run import Run
+import mlflow
 
 def get_config(config_file):
     """
@@ -113,12 +114,14 @@ def get_train_loader(cfg, world_size, distributed):
                         train_dataset,
                         sampler = train_sampler,
                         batch_size=cfg['data']['batch_size'],
+                        num_workers=cfg['data']['num_workers']
                         )
     else:
         train_dl = DataLoader(
                         train_dataset,
                         shuffle = True,
-                        batch_size=cfg['data']['batch_size']
+                        batch_size=cfg['data']['batch_size'],
+                        num_workers=cfg['data']['num_workers']
                         )
 
     return train_dataset, train_dl
@@ -158,13 +161,15 @@ def get_val_loader(cfg, world_size, distributed):
         val_dl = DataLoader(
                         val_dataset,
                         sampler = val_sampler,
-                        batch_size = 1
+                        batch_size = 1,
+                        num_workers=cfg['data']['num_workers']
                         )
     else:
         val_dl = DataLoader(
                         val_dataset,
                         shuffle = True,
-                        batch_size = 1
+                        batch_size = 1,
+                        num_workers=cfg['data']['num_workers']
                         )
 
     return val_dataset, val_dl
@@ -214,16 +219,16 @@ def get_optimizer(cfg, E, D):
     torch optimizer
     """
 
-    if cfg['optimizer']['algorithm'].lower() == 'adam':
+    if cfg['training']['optimizer']['algorithm'].lower() == 'adam':
         optimizer = torch.optim.Adam(
                 list(E.parameters())+list(D.parameters()),
-                lr=cfg['optimizer']['learning_rate']
+                lr=cfg['training']['optimizer']['learning_rate']
                 )
-    elif cfg['optimizer']['algorithm'].lower() == 'sgd':
+    elif cfg['training']['optimizer']['algorithm'].lower() == 'sgd':
         optimizer = torch.optim.SGD(
                 list(E.parameters())+list(D.parameters()),
-                lr=cfg['optimizer']['learning_rate'],
-                momentum=cfg['optimizer']['momentum']
+                lr=cfg['training']['optimizer']['learning_rate'],
+                momentum=cfg['training']['optimizer']['momentum']
                 )
     else:
         raise NotImplementedError
@@ -294,7 +299,9 @@ def log_metric(logger, cfg, name, val, num_iter):
     if cfg['training']['logging']['logger'] == 'tensorboard':
         logger.add_scalar(name, val, num_iter)
     elif cfg['training']['logging']['logger'] == 'aml':
-        logger.log(name, val)
+        #logger.log(name, val)
+        mlflow.log_metric(name, val, num_iter)
+        print(f'logging {name} at iter {num_iter}')
     else:
         raise NotImplementedError
 

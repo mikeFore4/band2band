@@ -6,6 +6,7 @@ import torch.nn as nn
 #from tqdm import tqdm
 import utils
 from azureml_env_adapter import set_environment_variables
+import mlflow
 
 def validate(cfg, E, D, val_data_loader, reconstruction_gen_loss, dataset_len,
         device):
@@ -46,7 +47,7 @@ def validate(cfg, E, D, val_data_loader, reconstruction_gen_loss, dataset_len,
 
         return total_gen_loss
 
-def train(cfg, device, world_size, local_rank, distributed):
+def train(cfg, world_size, local_rank, distributed):
     """
     Performs training of Encoder and Decoder modules
 
@@ -58,10 +59,12 @@ def train(cfg, device, world_size, local_rank, distributed):
         rank number of master process for distributed training
     """
 
+    device = torch.device(f'cuda:{local_rank}')
+    torch.cuda.set_device(local_rank)
     #initialize encoder
     print('Initializing Encoder')
     E = utils.get_encoder(cfg)
-    E = E.to(device)
+    E = E.cuda()
     if distributed:
         E = nn.parallel.DistributedDataParallel(E, device_ids=[local_rank],
                 output_device=local_rank)
@@ -69,7 +72,7 @@ def train(cfg, device, world_size, local_rank, distributed):
     #initialize decoder
     print('Initializing Decoder')
     D = utils.get_decoder(cfg)
-    D = D.to(device)
+    D = D.cuda()
     if distributed:
         D = nn.parallel.DistributedDataParallel(D, device_ids=[local_rank],
                 output_device=local_rank)
@@ -193,18 +196,23 @@ def run_training(cfg, local_rank):
     os.makedirs(cfg['model_dir'], exist_ok = True)
     utils.write_config(cfg)
 
-    device, world_size = utils.get_device_information()
+    #device, world_size = utils.get_device_information()
+    world_size = int(os.environ['WORLD_SIZE'])
     distributed = world_size > 1
 
     if distributed:
-        torch.cuda.set_device(local_rank)
-        dist.init_process_group(cfg['backend'], rank=local_rank,
-                world_size=world_size, init_method='env://')
+        #torch.cuda.set_device(local_rank)
+        dist.init_process_group(cfg['backend'], init_method='env://')
     else:
         world_size = 1
         local_rank = 0
 
-    train(cfg, device, world_size, local_rank, distributed)
+    if cfg['training']['logging']['logger'] == 'aml':
+        with mlflow.start_run():
+            train(cfg, world_size, local_rank, distributed)
+    else:
+        train(cfg, world_size, local_rank, distributed)
+
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
