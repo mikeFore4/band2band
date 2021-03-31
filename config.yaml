@@ -15,26 +15,22 @@ loss:
     reconstruction_self:
         type: L2
         weight: 0.0
+    validate:
+        type: L2
 model:
+    up_down_blocks: 3
+    up_down_channel_multiplier: 2
+    const_channel_multiplier: 1
+    const_blocks_per: 2
+    scale_pooling_factor: 2
     decoder:
-        const_blocks: 2
-        const_channel_divisor: 2
-        input_channels: 128
         mode: bilinear
         num_classes: 14
         output_channels: 1
-        scale_factor: 2
-        up_blocks: 3
-        up_channel_divisor: 2
     encoder:
-        const_blocks: 2
-        const_channel_multiplier: 1
-        down_blocks: 3
-        down_channel_multiplier: 2
         first_out_channels: 32
         input_channels: 1
         num_classes: 14
-        pooling_factor: 2
 model_dir: outputs/run0
 training:
     optimizer:
@@ -42,25 +38,25 @@ training:
         learning_rate: 0.001
         momentum: 0.9
     checkpoint_dir: outputs/run0/checkpoints/
-    iterations: 30
+    iterations: 5000
     logging:
         directory: logs/run0
-        log_every: 5
+        log_every: 50
         logger: aml
 validation:
     do_validation: true
-    iterations: 10
-    val_every: 10
+    iterations: 50
+    val_every: 50
 checkpoint:
     encoder: Encoder_final.pth
     decoder: Decoder_final.pth
 aml:
     use_aml: true
     aml_config: aml/aml_config.json
-    experiment_name: debugging
+    experiment_name: hyperdrive
     compute:
         use_instance: false
         name: gpu-cluster
     process_count: 4
-    node_count: 2
+    node_count: 3
     dataset: b2b

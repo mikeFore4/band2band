@@ -83,9 +83,10 @@ def train(cfg, world_size, local_rank, distributed):
         val_dataset, val_data_loader = utils.get_val_loader(cfg, world_size,
                 distributed)
     optimizer = utils.get_optimizer(cfg, E, D)
-    reconstruction_self_loss = utils.get_reconstruction_self_loss(cfg)
-    reconstruction_gen_loss = utils.get_reconstruction_gen_loss(cfg)
-    match_loss = utils.get_feature_match_loss(cfg)
+    reconstruction_self_loss = utils.get_loss(cfg['loss']['reconstruction_self']['type'])
+    reconstruction_gen_loss = utils.get_loss(cfg['loss']['reconstruction_gen']['type'])
+    match_loss = utils.get_loss(cfg['loss']['matching']['type'])
+    val_loss = utils.get_loss(cfg['loss']['validate'])
     if local_rank == 0:
         logger = utils.get_logger(cfg)
     total_self_loss = 0
@@ -172,7 +173,7 @@ def train(cfg, world_size, local_rank, distributed):
         if cfg['validation']['do_validation']:
             if (num_iter+1) % cfg['validation']['val_every'] == 0:
                 val_loss = validate(cfg, E, D, val_data_loader,
-                        reconstruction_gen_loss, len(val_dataset),
+                        val_loss, len(val_dataset),
                         device)
                 if local_rank == 0:
                     utils.log_metric(logger, cfg, 'Validation_loss/generative_reconstruction',
@@ -196,8 +197,11 @@ def run_training(cfg, local_rank):
     os.makedirs(cfg['model_dir'], exist_ok = True)
     utils.write_config(cfg)
 
-    #device, world_size = utils.get_device_information()
-    world_size = int(os.environ['WORLD_SIZE'])
+    if 'WORLD_SIZE' in os.environ.keys():
+        world_size = int(os.environ['WORLD_SIZE'])
+    else:
+        _, world_size = utils.get_device_information()
+
     distributed = world_size > 1
 
     if distributed:
@@ -213,17 +217,78 @@ def run_training(cfg, local_rank):
     else:
         train(cfg, world_size, local_rank, distributed)
 
+def process_args(args):
+    cfg = utils.get_config(args.config_file)
+
+    if args.data_path is not None:
+        cfg['data']['dir_head'] = args.data_path
+    if args.batch_size is not None:
+        cfg['data']['batch_size'] = args.batch_size
+    if args.matching_weight is not None:
+        cfg['loss']['matching']['weight'] = args.matching_weight
+    if args.rec_gen_weight is not None:
+        cfg['loss']['reconstruction_gen']['weight'] = args.rec_gen_weight
+    if args.rec_self_weight is not None:
+        cfg['loss']['reconstruction_self']['weight'] = args.rec_self_weight
+    if args.const_blocks is not None:
+        cfg['model']['const_blocks_per'] = args.const_blocks
+    if args.up_down_blocks is not None:
+        cfg['model']['up_down_blocks'] = args.up_down_blocks
+    if args.const_mult is not None:
+        cfg['model']['const_channel_multiplier'] = args.const_mult
+    if args.up_down_multiplier is not None:
+        cfg['model']['up_down_channel_multiplier'] = args.up_down_multiplier
+    if args.pooling_factor is not None:
+        cfg['model']['scale_pooling_factor'] = args.pooling_factor
+    if args.optimizer is not None:
+        cfg['training']['optimizer']['algorithm'] = args.optimizer
+    if args.learning_rate is not None:
+        cfg['training']['optimizer']['learning_rate'] = args.learning_rate
+    if args.momentum is not None:
+        cfg['training']['optimizer']['momentum'] = args.momentum
+
+    cfg['model']['encoder']['down_blocks'] = cfg['model']['up_down_blocks']
+    cfg['model']['decoder']['up_blocks'] = cfg['model']['up_down_blocks']
+    cfg['model']['encoder']['const_channel_multiplier'] = cfg['model']['const_channel_multiplier']
+    cfg['model']['decoder']['const_channel_divisor'] = cfg['model']['const_channel_multiplier']
+    cfg['model']['encoder']['down_channel_multiplier'] = cfg['model']['up_down_channel_multiplier']
+    cfg['model']['decoder']['up_channel_divisor'] = cfg['model']['up_down_channel_multiplier']
+    cfg['model']['encoder']['const_blocks'] = cfg['model']['const_blocks_per']
+    cfg['model']['decoder']['const_blocks'] = cfg['model']['const_blocks_per']
+    cfg['model']['encoder']['pooling_factor'] = cfg['model']['scale_pooling_factor']
+    cfg['model']['decoder']['scale_factor'] = cfg['model']['scale_pooling_factor']
+
+    # compute input channels for decoder
+    out_channels = cfg['model']['encoder']['first_out_channels']*\
+            (cfg['model']['encoder']['down_channel_multiplier']**\
+            (cfg['model']['encoder']['down_blocks']-1))
+    out_channels = out_channels *\
+            (cfg['model']['encoder']['const_channel_multiplier']**\
+            (cfg['model']['encoder']['const_blocks']))
+
+    cfg['model']['decoder']['input_channels'] = out_channels
+
+    return cfg
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config-file', default='config.yaml', type=str)
     parser.add_argument('--local_rank',default=0,type=int)
-    parser.add_argument('--data-path',type=str)
+    parser.add_argument('--data_path',type=str)
+    parser.add_argument('--batch_size',type=int)
+    parser.add_argument('--matching_weight',type=float)
+    parser.add_argument('--rec_gen_weight',type=float)
+    parser.add_argument('--rec_self_weight',type=float)
+    parser.add_argument('--const_blocks',type=int)
+    parser.add_argument('--up_down_blocks',type=int)
+    parser.add_argument('--pooling_factor',type=int)
+    parser.add_argument('--up_down_multiplier',type=int)
+    parser.add_argument('--const_mult',type=int)
+    parser.add_argument('--optimizer',type=str)
+    parser.add_argument('--learning_rate',type=float)
+    parser.add_argument('--momentum',type=float)
 
     args = parser.parse_args()
-
-    cfg = utils.get_config(args.config_file)
-    if args.data_path is not None:
-        cfg['data']['dir_head'] = args.data_path
+    cfg = process_args(args)
 
     run_training(cfg, args.local_rank)

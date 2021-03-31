@@ -284,6 +284,16 @@ def get_feature_match_loss(cfg):
 
     return loss
 
+def get_loss(loss_type):
+    if loss_type == 'L1':
+        loss = nn.L1Loss()
+    elif loss_type == 'L2':
+        loss = nn.L2Loss()
+    else:
+        raise NotImplementedError
+
+    return loss
+
 def get_logger(cfg):
     if cfg['training']['logging']['logger'] == 'tensorboard':
         #logger = SummaryWriter(cfg['training']['logging']['directory'])
@@ -301,7 +311,6 @@ def log_metric(logger, cfg, name, val, num_iter):
     elif cfg['training']['logging']['logger'] == 'aml':
         #logger.log(name, val)
         mlflow.log_metric(name, val, num_iter)
-        print(f'logging {name} at iter {num_iter}')
     else:
         raise NotImplementedError
 

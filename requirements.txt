@@ -8,3 +8,4 @@ azureml-core
 azureml-dataset-runtime
 pandas
 azureml-mlflow
+azureml-train
