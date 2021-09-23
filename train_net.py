@@ -6,7 +6,6 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 #from tqdm import tqdm
 import utils
-from azureml_env_adapter import set_environment_variables
 
 def validate(cfg, E, D, val_data_loader, reconstruction_gen_loss, dataset_len,
         device):
